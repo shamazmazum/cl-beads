@@ -37,6 +37,29 @@
     (draw-rect)
     (cairo-stroke ctx)))
 
+(defun gdk-rectangle-contains-point (rect x y)
+  (let ((rect-x      (gdk-rectangle-x      rect))
+        (rect-y      (gdk-rectangle-y      rect))
+        (rect-width  (gdk-rectangle-width  rect))
+        (rect-height (gdk-rectangle-height rect)))
+    (and
+     (<= rect-x x (+ rect-x rect-width))
+     (<= rect-y y (+ rect-y rect-height)))))
+
+;; Is it really useful?
+(defun filter-visible (ctx allocation model)
+  (flet ((visible (bead)
+           (destructuring-bind (rect . color) bead
+             (declare (ignore color))
+             (multiple-value-bind (x-start y-start)
+                 (cairo-user-to-device ctx (rect-x rect) (rect-y rect))
+               (gdk-rectangle-contains-point allocation x-start y-start)))))
+    (si:take-while
+     #'visible
+     (si:drop-while
+      (alex:compose #'not #'visible)
+      model))))
+
 (defun draw-scheme (widget ctx)
   "Stub for drawing the scheme"
   (let* ((ctx (pointer ctx))
@@ -63,8 +86,7 @@
     ;; Set line width
     (cairo-set-line-width ctx (scheme-area-outline-width widget))
 
-    ;; TODO: Maybe took only visible
-    (si:do-iterator (bead (beads-iterator model))
+    (si:do-iterator (bead (filter-visible ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
         (draw-bead ctx rect color)))))
                                         

@@ -14,6 +14,7 @@
                (:file "scheme-area")
                (:file "gui"))
   :depends-on (:serapeum
+               :alexandria
                :stateless-iterators
                :cl-cffi-gtk
                :cl-css))
