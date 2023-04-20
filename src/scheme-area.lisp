@@ -15,7 +15,10 @@
    (position      :initform 0d0
                   :initarg  :position
                   :type     double-float
-                  :accessor scheme-area-position))
+                  :accessor scheme-area-position)
+   (coord-trans   :initform (cairo-matrix-init-identity)
+                  :type     list
+                  :accessor scheme-area-coord-trans))
   (:metaclass gobject-class))
 
 (defun draw-bead (ctx rect color)
@@ -60,20 +63,11 @@
       (alex:compose #'not #'visible)
       model))))
 
-(defun draw-scheme (widget ctx)
-  "Stub for drawing the scheme"
-  (let* ((ctx (pointer ctx))
-         (allocation (gtk-widget-get-allocation widget))
+(defun setup-coordinate-system (ctx scheme-area scheme-height)
+  (let* ((allocation (gtk-widget-get-allocation scheme-area))
          (width  (float (gdk-rectangle-width  allocation) 0d0))
          (height (float (gdk-rectangle-height allocation) 0d0))
-         (maxy (/ height width))
-         (model (scheme-area-model widget))
-         (scheme-height (estimate-height model)))
-    ;; Fill with background
-    (gtk-render-background
-     (gtk-widget-get-style-context widget)
-     ctx 0 0 width height)
-    ;; Set coordinate system
+         (maxy (/ height width)))
     ;; X spans from 0 to 1
     ;; Y spans from 0 to maxy
     (cairo-translate ctx 0 height)
@@ -82,20 +76,67 @@
     (cairo-translate
      ctx 0
      (- (* (max (- scheme-height maxy) 0)
-           (scheme-area-position widget))))
+           (scheme-area-position scheme-area))))))
+
+(defun draw-scheme (widget ctx)
+  "Stub for drawing the scheme"
+  (let ((ctx (pointer ctx))
+        (allocation (gtk-widget-get-allocation widget))
+        (model (scheme-area-model widget)))
+    ;; Fill with background
+    (gtk-render-background
+     (gtk-widget-get-style-context widget)
+     ctx 0 0
+     (gdk-rectangle-width  allocation)
+     (gdk-rectangle-height allocation))
+    ;; Set coordinate system
+    (setup-coordinate-system
+     ctx widget
+     (estimate-height model))
+    ;; Store current transform
+    (setf (scheme-area-coord-trans widget)
+          (cairo-matrix-invert
+           (cairo-get-matrix ctx)))
     ;; Set line width
     (cairo-set-line-width ctx (scheme-area-outline-width widget))
 
     (si:do-iterator (bead (filter-visible ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
         (draw-bead ctx rect color)))))
-                                        
+
 (defun button-clicked (widget event)
-  (declare (ignore widget))
-  (format t "X=~f Y=~f Button=~d~%"
-          (gdk-event-button-x      event)
-          (gdk-event-button-y      event)
-          (gdk-event-button-button event)))
+  (when (= (gdk-event-button-button event) 1)
+    (let* ((allocation (gtk-widget-get-allocation widget))
+           (model (scheme-area-model widget))
+           (document (scheme-model-document model)))
+      (multiple-value-bind (x y)
+          (cairo-matrix-transform-point
+           (scheme-area-coord-trans widget)
+           (+ (gdk-event-button-x event)
+              (gdk-rectangle-x allocation))
+           (+ (gdk-rectangle-y allocation)
+              (gdk-event-button-y event)))
+        (let ((bead-idx
+               (car
+                (si:consume-one
+                 (si:drop-while
+                  (lambda (bead)
+                    (destructuring-bind (n rect . color) bead
+                      (declare (ignore color)
+                               (ignorable n rect))
+                      (not
+                       (and
+                        (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
+                        (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
+                  (si:enumerate (beads-iterator model)))))))
+          ;; Update bead color
+          ;; FIXME: Or just signal here?
+          (when (< bead-idx (array-total-size (document-scheme document)))
+            ;; How can it be otherwise?
+            (setf (row-major-aref (document-scheme document) bead-idx)
+                  (document-palette-idx document))
+            ;; TODO: Redraw only a small area
+            (gtk-widget-queue-draw widget)))))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))
