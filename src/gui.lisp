@@ -101,7 +101,21 @@
                                            :model (make-instance 'draft-model :document document)))
            (simulation-area (make-instance 'scheme-area
                                            :width-request 160
-                                           :model (make-instance 'draft-model :document document))))
+                                           :model (make-instance 'draft-model :document document)))
+           (all-areas (list draft-area corrected-area simulation-area)))
+
+      (dolist (area all-areas)
+        (g-signal-connect
+         area "my-bead-clicked"
+         (lambda (widget bead-idx)
+           (declare (ignore widget))
+           (when (< bead-idx (array-total-size (document-scheme document)))
+             ;; How can it be otherwise?
+             (let ((current-color (document-palette-idx document)))
+               (symbol-macrolet ((bead (row-major-aref (document-scheme document) bead-idx)))
+                 (setf bead (if (= bead current-color) 0 current-color))))
+             ;; TODO: Redraw only a small area
+             (mapc #'gtk-widget-queue-draw all-areas)))))
 
       (g-signal-connect
        window "destroy"
@@ -136,11 +150,9 @@
            adjustment "value-changed"
            (lambda (object)
              (declare (ignore object))
-             (mapc
-              (lambda (area)
-                (setf (scheme-area-position area)
-                      (- 1 (gtk-adjustment-value adjustment))))
-              (list draft-area corrected-area simulation-area))))
+             (dolist (area all-areas)
+               (setf (scheme-area-position area)
+                     (- 1 (gtk-adjustment-value adjustment))))))
 
           (gtk-box-pack-start
            workspace-box
@@ -218,8 +230,7 @@
                        (palette-button-color background-button)
                        (palette-button-color color-button))
                 ;; Redraw areas
-                (mapc #'gtk-widget-queue-draw
-                      (list draft-area corrected-area simulation-area))))
+                (mapc #'gtk-widget-queue-draw all-areas)))
 
              (g-signal-connect
               color-button "my-color-set"
@@ -230,8 +241,7 @@
                 (when (= (document-palette-idx document) n)
                   (update-current-color current-color document))
                 ;; Redraw areas
-                (mapc #'gtk-widget-queue-draw
-                      (list draft-area corrected-area simulation-area))))
+                (mapc #'gtk-widget-queue-draw all-areas)))
              background-button))
          nil (si:range 0 (palette-length document)))
 

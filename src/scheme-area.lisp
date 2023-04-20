@@ -106,9 +106,8 @@
 
 (defun button-clicked (widget event)
   (when (= (gdk-event-button-button event) 1)
-    (let* ((allocation (gtk-widget-get-allocation widget))
-           (model (scheme-area-model widget))
-           (document (scheme-model-document model)))
+    (let ((allocation (gtk-widget-get-allocation widget))
+          (model (scheme-area-model widget)))
       (multiple-value-bind (x y)
           (cairo-matrix-transform-point
            (scheme-area-coord-trans widget)
@@ -129,14 +128,7 @@
                         (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
                         (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
                   (si:enumerate (beads-iterator model)))))))
-          ;; Update bead color
-          ;; FIXME: Or just signal here?
-          (when (< bead-idx (array-total-size (document-scheme document)))
-            ;; How can it be otherwise?
-            (setf (row-major-aref (document-scheme document) bead-idx)
-                  (document-palette-idx document))
-            ;; TODO: Redraw only a small area
-            (gtk-widget-queue-draw widget)))))))
+          (g-signal-emit widget "my-bead-clicked" bead-idx))))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))
@@ -147,3 +139,17 @@
 (defmethod (setf scheme-area-position) :after (value (scheme-area scheme-area))
   (declare (ignore value))
   (gtk-widget-queue-draw scheme-area))
+
+(cffi:with-foreign-object (param 'g-type)
+  (setf (cffi:mem-ref param 'g-type)
+        +g-type-uint+)
+  (g-signal-newv
+   "my-bead-clicked"
+   +g-type-object+
+   '(:run-last)
+   (cffi:null-pointer)
+   (cffi:null-pointer)
+   (cffi:null-pointer)
+   (cffi:null-pointer)
+   +g-type-none+ 1
+   param))
