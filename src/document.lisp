@@ -72,22 +72,19 @@
 
 (defclass document ()
   ((palette      :initform (copy-seq *initial-palette*)
+                 :initarg  :palette
                  :type     palette
                  :reader   document-palette)
    (palette-idx  :initform 0
+                 :initarg  :palette-idx
                  :type     unsigned-byte
                  :accessor document-palette-idx)
-   (width        :initform *default-width*
-                 :type     unsigned-byte
-                 :accessor document-width)
-   (height       :initform *default-height*
-                 :type     unsigned-byte
-                 :accessor document-height)
    (scheme       :initform (make-array (list *default-height*
                                              *default-width*)
                                        :element-type 'unsigned-byte
                                        ;; Initialize with background color
                                        :initial-element 0)
+                 :initarg  :scheme
                  :type     scheme
                  :accessor document-scheme)))
 
@@ -110,13 +107,22 @@
 (defun current-color (document)
   (palette-color document (document-palette-idx document)))
 
-(sera:-> update-scheme (document)
+(sera:-> update-scheme (document unsigned-byte unsigned-byte)
          (values &optional))
-(defun update-scheme (document)
+(defun update-scheme (document width height)
   ;; TODO: Maybe keep the old data somehow?
   (setf (document-scheme document)
-        (make-array (list (document-height document)
-                          (document-width  document))
+        (make-array (list height width)
                     :element-type 'unsigned-byte
                     :initial-element 0))
   (values))
+
+(sera:-> document-height (document)
+         (values unsigned-byte &optional))
+(defun document-height (document)
+  (array-dimension (document-scheme document) 0))
+
+(sera:-> document-width (document)
+         (values unsigned-byte &optional))
+(defun document-width (document)
+  (array-dimension (document-scheme document) 1))

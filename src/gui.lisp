@@ -73,9 +73,7 @@
        (document-width  document)
        (document-height document))
     (when changedp
-      (setf (document-width  document) width
-            (document-height document) height)
-      (update-scheme document)
+      (update-scheme document width height)
       (mapc #'gtk-widget-queue-draw areas)))
   (values))
 
