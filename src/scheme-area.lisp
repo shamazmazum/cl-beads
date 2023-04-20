@@ -128,7 +128,8 @@
                         (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
                         (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
                   (si:enumerate (beads-iterator model)))))))
-          (g-signal-emit widget "my-bead-clicked" bead-idx))))))
+          (when bead-idx
+            (g-signal-emit widget "my-bead-clicked" bead-idx)))))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))

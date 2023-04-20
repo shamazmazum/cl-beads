@@ -98,10 +98,10 @@
                                            :model (make-instance 'draft-model :document document)))
            (corrected-area  (make-instance 'scheme-area
                                            :width-request 160
-                                           :model (make-instance 'draft-model :document document)))
+                                           :model (make-instance 'corrected-model :document document)))
            (simulation-area (make-instance 'scheme-area
                                            :width-request 160
-                                           :model (make-instance 'draft-model :document document)))
+                                           :model (make-instance 'dummy-model :document document)))
            (all-areas (list draft-area corrected-area simulation-area)))
 
       (dolist (area all-areas)

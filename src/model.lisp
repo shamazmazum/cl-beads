@@ -11,9 +11,6 @@ width of a drawing area.")
              :initarg  :document
              :initform (error "Specify document"))))
 
-(defclass draft-model (scheme-model)
-  ())
-
 (sera:defconstructor rect
   (x      double-float)
   (y      double-float)
@@ -24,34 +21,78 @@ width of a drawing area.")
   (:documentation "Return iterator which iterates over beads in the
 document returning a pair (RECT . COLOR)."))
 
+(defgeneric estimate-height (model)
+  (:documentation "Get estimated height of a scheme in user corrdinate
+system."))
+
+(defun bead-size (width)
+  (min *maximum-bead-size*
+       (float (/ width) 0d0)))
+
+(defmethod estimate-height ((model scheme-model))
+  (let* ((document (scheme-model-document model))
+         (width  (document-width  document))
+         (height (document-height document))
+         (bead-size (bead-size width)))
+    (* bead-size height)))
+
+;; Draft
+(defclass draft-model (scheme-model)
+  ())
+
 (defmethod beads-iterator ((model draft-model))
   (let* ((document (scheme-model-document model))
          (width  (document-width  document))
          (height (document-height document))
          (scheme (document-scheme document))
-         (bead-size (min *maximum-bead-size*
-                         (float (/ width) 0d0)))
+         (bead-size (bead-size width))
          (offset (/ (- 1 (* bead-size width)) 2)))
     (si:imap
      (lambda (coord)
        (destructuring-bind (i . j) coord
          (cons
           (rect (+ offset (* j bead-size))
-                (+ 0      (* i bead-size))
+                (+        (* i bead-size))
                 bead-size bead-size)
           (palette-color
            document (aref scheme i j)))))
      (si:product (si:range 0 height)
                  (si:range 0 width)))))
 
-(defgeneric estimate-height (model)
-  (:documentation "Get estimated height of a scheme in user corrdinate
-system."))
+;; Dummy
+(defclass dummy-model (scheme-model)
+  ())
 
-(defmethod estimate-height ((model draft-model))
+(defmethod beads-iterator ((model dummy-model))
+  (si:list->iterator nil))
+
+(defmethod estimate-height ((model dummy-model))
+  0d0)
+
+;; Corrected
+(defclass corrected-model (scheme-model)
+  ())
+
+(defmethod beads-iterator ((model corrected-model))
   (let* ((document (scheme-model-document model))
          (width  (document-width  document))
-         (height (document-height document))
-         (bead-size (min *maximum-bead-size*
-                         (float (/ width) 0d0))))
-    (* bead-size height)))
+         (scheme (document-scheme document))
+         (bead-size (bead-size (1+ width)))
+         (offset (/ (- 1 (* bead-size (1+ width))) 2)))
+    (si:imap
+     (lambda (idx)
+       (multiple-value-bind (q r)
+           (floor idx (1+ (* width 2)))
+         (cons
+          (if (< r width)
+              ;; Short row
+              (rect (+ offset (* bead-size (+ r 0.5)))
+                    (+        (* bead-size q 2))
+                    bead-size bead-size)
+              ;; Long row
+              (rect (+ offset    (* bead-size (- r width)))
+                    (+ bead-size (* bead-size q 2))
+                    bead-size bead-size))
+          (palette-color
+           document (row-major-aref scheme idx)))))
+     (si:range 0 (array-total-size scheme)))))
