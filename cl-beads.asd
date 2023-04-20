@@ -8,6 +8,7 @@
   :pathname "src"
   :components ((:file "package")
                (:file "document")
+               (:file "jbb-format")
                (:file "model")
                (:file "gtk")
                (:file "palette-button")
