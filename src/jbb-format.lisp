@@ -47,3 +47,48 @@
                                          (length (first model)))
                                    :element-type 'unsigned-byte
                                    :initial-contents model))))))
+
+(sera:-> write-jbb (document (or pathname string))
+         (values list &optional))
+(defun write-jbb (document pathname)
+  (let ((form `(cl-beads-jbb::jbb
+                (cl-beads-jbb::version 1)
+                (cl-beads-jbb::author       ,(document-author       document))
+                (cl-beads-jbb::organization ,(document-organization document))
+                (cl-beads-jbb::notes        ,(document-notes        document))
+                (cl-beads-jbb::colors
+                 ,@(map 'list
+                        (lambda (color)
+                          `(cl-beads-jbb::rgb
+                            ,(floor (* 255 (color-r color)))
+                            ,(floor (* 255 (color-g color)))
+                            ,(floor (* 255 (color-b color)))
+                            255))
+                        (document-palette document)))
+                (cl-beads-jbb::view
+                 (cl-beads-jbb::draft-visible cl-beads-jbb::true)
+                 (cl-beads-jbb::corrected-visible cl-beads-jbb::true)
+                 (cl-beads-jbb::simulation-visible cl-beads-jbb::true)
+                 (cl-beads-jbb::report-visible cl-beads-jbb::true)
+                 (cl-beads-jbb::selected-tool "pencil")
+                 (cl-beads-jbb::selected-color ,(document-palette-idx document))
+                 (cl-beads-jbb::zoom 2)
+                 (cl-beads-jbb::scroll 0)
+                 (cl-beads-jbb::shift 0)
+                 (cl-beads-jbb::draw-colors true)
+                 (cl-beads-jbb::draw-symbols false)
+                 (cl-beads-jbb::symbols "·abcdefghijklmnopqrstuvwxyz+-/\\*"))
+                (cl-beads-jbb::model
+                 ,@(loop for i below (document-height document) collect
+                         (cons 'cl-beads-jbb::row
+                               (loop for j below (document-width document) collect
+                                     (aref (document-scheme document) i j))))))))
+    (with-open-file (output pathname
+                            :direction         :output
+                            :if-exists         :supersede
+                            :if-does-not-exist :create)
+      (let ((*package* (find-package :cl-beads-jbb)))
+        (write form
+               :stream output
+               :case   :downcase)))
+    form))

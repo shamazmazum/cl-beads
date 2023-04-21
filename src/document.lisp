@@ -86,7 +86,19 @@
                                        :initial-element 0)
                  :initarg  :scheme
                  :type     scheme
-                 :accessor document-scheme)))
+                 :accessor document-scheme)
+   (author       :initform ""
+                 :initarg  :author
+                 :type     string
+                 :accessor document-author)
+   (organization :initform ""
+                 :initarg  :organization
+                 :type     string
+                 :accessor document-organization)
+   (notes        :initform ""
+                 :initarg  :organization
+                 :type     string
+                 :accessor document-notes)))
 
 (defgeneric palette-color (document index)
   (:documentation "Accessor for a particular color from the document's palette."))

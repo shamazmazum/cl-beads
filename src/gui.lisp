@@ -16,7 +16,7 @@
 
 
 (sera:-> open-dialog (gtk-window)
-         (values (or null document) &optional))
+         (values (or string null) &optional))
 (defun open-dialog (parent)
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Open Document"
@@ -28,11 +28,10 @@
     (gtk-file-filter-add-pattern filter "*.jbb")
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
-    (let ((filename
-           (when (eq (gtk-dialog-run dialog) :accept)
-             (gtk-file-chooser-get-filename dialog))))
-        (gtk-widget-destroy dialog)
-        (when filename (read-jbb filename)))))
+    (prog1
+        (when (eq (gtk-dialog-run dialog) :accept)
+          (gtk-file-chooser-get-filename dialog))
+      (gtk-widget-destroy dialog))))
 
 (sera:-> settings-dialog
          (gtk-window unsigned-byte unsigned-byte)
@@ -97,7 +96,7 @@
       (mapc #'gtk-widget-queue-draw areas)))
   (values))
 
-(defun open-document (document window-callback)
+(defun open-document (document window-callback &key (pathname #p""))
   (let* ((window (make-instance 'gtk-window
                                 :title          "cl-beads"
                                 :default-width  600
@@ -191,11 +190,20 @@
        open-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (handler-case
-             (open-document (open-dialog window) window-callback)
-           (error (c)
-             ;; TODO: Do something
-             (princ c))))))
+         (let ((pathname (open-dialog window)))
+           (when pathname
+             (handler-case
+                 (open-document (read-jbb pathname) window-callback :pathname pathname)
+               (error (c)
+                 ;; TODO: Do something
+                 (princ c)))))))
+      (g-signal-connect
+       save-button "clicked"
+       (lambda (widget)
+         (declare (ignore widget))
+         ;; TODO: Else branch
+         (when pathname
+           (write-jbb document pathname)))))
 
     (let ((edit-box (make-instance 'gtk-hbox))
           (undo-button (make-stock-button "edit-undo"))

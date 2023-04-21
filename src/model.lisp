@@ -1,7 +1,7 @@
 (in-package :cl-beads)
 
 (declaim (type double-float *maximum-bead-size*))
-(defparameter *maximum-bead-size* 8d-2
+(defparameter *maximum-bead-size* 6.5d-2
   "Bead size cannot be bigger than this parameter. 1 means the whole
 width of a drawing area.")
 
