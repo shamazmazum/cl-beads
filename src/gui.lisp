@@ -171,7 +171,7 @@
                         :orientation :vertical
                         :adjustment  adjustment)
          :expand nil))
-      (gtk-box-pack-start workspace-box frame    :expand nil))
+      (gtk-box-pack-start workspace-box frame :expand nil))
 
     (let ((document-box (make-instance 'gtk-hbox))
           (new-button  (make-stock-button "document-new"))
