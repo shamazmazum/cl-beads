@@ -89,17 +89,3 @@ BUTTON changes its color."
 (defmethod (setf palette-button-color) :after (value (button palette-button))
   (declare (ignore value))
   (update-css button))
-
-(flet ((trivial-new-signal (name)
-         (g-signal-newv
-          name
-          +g-type-object+
-          '(:run-last)
-          (cffi:null-pointer)
-          (cffi:null-pointer)
-          (cffi:null-pointer)
-          (cffi:null-pointer)
-          +g-type-none+ 0
-          (cffi:null-pointer))))
-  (mapc #'trivial-new-signal
-        '("my-color-set" "my-background-change-request")))

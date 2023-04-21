@@ -149,17 +149,3 @@ as \"my-bead-clicked\"."
 (defmethod (setf scheme-area-position) :after (value (scheme-area scheme-area))
   (declare (ignore value))
   (gtk-widget-queue-draw scheme-area))
-
-(cffi:with-foreign-object (param 'g-type)
-  (setf (cffi:mem-ref param 'g-type)
-        +g-type-uint+)
-  (g-signal-newv
-   "my-bead-clicked"
-   +g-type-object+
-   '(:run-last)
-   (cffi:null-pointer)
-   (cffi:null-pointer)
-   (cffi:null-pointer)
-   (cffi:null-pointer)
-   +g-type-none+ 1
-   param))

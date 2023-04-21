@@ -2,7 +2,7 @@
 
 (defun make-stock-button (stock-id)
   (make-instance 'gtk-button
-                 :image (gtk-image-new-from-icon-name stock-id 12)))
+                 :image (gtk-image-new-from-icon-name stock-id :large-toolbar)))
 
 (defun make-menu-entry (stock-id)
   (make-instance 'gtk-image-menu-item
@@ -410,7 +410,7 @@ document's window is created or destroyed."
     ;; Pack everyting and call the callback
     (gtk-box-pack-start main-box menu-bar :expand nil)
     (gtk-box-pack-start main-box toolbar-box :expand nil)
-    (gtk-box-pack-end   main-box workspace-box :padding 10)
+    (gtk-box-pack-end   main-box workspace-box :padding 2)
 
     (gtk-container-add window main-box)
     (funcall window-callback :open window)
@@ -418,6 +418,7 @@ document's window is created or destroyed."
 
 (defun run ()
   "Run cl-beads. Use this function from the REPL."
+  (add-new-signals-once)
   (within-main-loop
     (let (windows)
       (flet ((callback (action window)
@@ -430,3 +431,8 @@ document's window is created or destroyed."
                   (push window windows)
                   (gtk-widget-show-all window)))))
         (open-document (make-instance 'document) #'callback)))))
+
+(defun main ()
+  "Entry point for a stand-alone application"
+  (run)
+  (join-gtk-main))

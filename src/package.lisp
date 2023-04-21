@@ -3,4 +3,5 @@
   (:local-nicknames (#:si   #:stateless-iterators)
                     (#:alex #:alexandria)
                     (#:sera #:serapeum))
-  (:export #:run))
+  (:export #:run
+           #:main))

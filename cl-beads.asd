@@ -11,6 +11,7 @@
                (:file "jbb-format")
                (:file "model")
                (:file "gtk")
+               (:file "signals")
                (:file "palette-button")
                (:file "scheme-area")
                (:file "gui"))
@@ -19,3 +20,16 @@
                :stateless-iterators
                :cl-cffi-gtk
                :cl-css))
+
+(defsystem :cl-beads/application
+  :name :cl-beads/application
+  :depends-on (:cl-beads)
+  :build-operation program-op
+  :build-pathname "cl-beads"
+  :entry-point "cl-beads:main")
+
+#+sb-core-compression
+(defmethod asdf:perform ((o asdf:image-op) (c asdf:system))
+  (uiop:dump-image (asdf:output-file o c)
+                   :executable t
+                   :compression -1))
