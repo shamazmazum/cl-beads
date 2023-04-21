@@ -18,13 +18,16 @@
                            (floor (* 255 (color-b color))))))
     (cl-css:css `((button :background ,css-color)))))
 
-(sera:-> update-css (palette-button) t)
+(sera:-> update-css (palette-button)
+         (values &optional))
 (defun update-css (button)
   (gtk-css-provider-load-from-data
    (palette-button-css-provider button)
-   (button-css (palette-button-color button))))
+   (button-css (palette-button-color button)))
+  (values))
 
-(sera:-> choose-color (palette-button) t)
+(sera:-> choose-color (palette-button)
+         (values &optional))
 (defun choose-color (button)
   (let* ((color-chooser (make-instance 'gtk-color-chooser-dialog
                                        :title "Pick a color"
@@ -35,7 +38,8 @@
       (let ((color (gdk-rgba->color (gtk-color-chooser-get-rgba color-chooser))))
         (setf (palette-button-color button) color)
         (g-signal-emit button "my-color-set")))
-    (gtk-widget-destroy color-chooser)))
+    (gtk-widget-destroy color-chooser))
+  (values))
 
 (defmethod initialize-instance :after ((button palette-button) &rest args)
   (declare (ignore args))
