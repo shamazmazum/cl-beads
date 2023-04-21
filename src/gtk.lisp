@@ -33,6 +33,11 @@
    (float height 0d0)))
 (export 'gtk-render-background)
 
+(defcfun ("gtk_file_filter_set_name" gtk-file-filter-set-name) :void
+  (filter  (g-object gtk-file-filter))
+  (pattern :string))
+(export 'gtk-file-filter-set-name)
+
 ;; Cairo
 (in-package :cairo)
 
