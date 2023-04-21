@@ -14,9 +14,6 @@
   (setf (palette-button-color color-button)
         (current-color document)))
 
-
-(sera:-> open-dialog (gtk-window)
-         (values (or string null) &optional))
 (defun open-dialog (parent)
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Open Document"
@@ -28,10 +25,41 @@
     (gtk-file-filter-add-pattern filter "*.jbb")
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
-    (prog1
-        (when (eq (gtk-dialog-run dialog) :accept)
-          (gtk-file-chooser-get-filename dialog))
-      (gtk-widget-destroy dialog))))
+    (let ((pathname
+           (prog1
+               (when (eq (gtk-dialog-run dialog) :accept)
+                 (gtk-file-chooser-get-filename dialog))
+             (gtk-widget-destroy dialog))))
+      (when pathname
+        (handler-case
+            (values
+             (read-jbb pathname)
+             pathname)
+          (error (c)
+            ;; TODO: Do something
+            (princ c)
+            nil))))))
+
+(defun save-dialog (parent document &optional filename)
+  (let ((dialog (gtk-file-chooser-dialog-new
+                 "Save Document"
+                 parent
+                 :save
+                 "gtk-cancel" :cancel
+                 "gtk-save" :accept))
+        (filter (make-instance 'gtk-file-filter)))
+    (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
+    (if filename
+        (gtk-file-chooser-set-filename dialog filename)
+        (gtk-file-chooser-set-current-name dialog "Untitled.jbb"))
+    (gtk-file-filter-add-pattern filter "*.jbb")
+    (gtk-file-filter-set-name    filter "JBead file")
+    (gtk-file-chooser-add-filter dialog filter)
+
+    (when (eq (gtk-dialog-run dialog) :accept)
+      (let ((filename (gtk-file-chooser-get-filename dialog)))
+        (write-jbb document filename)))
+    (gtk-widget-destroy dialog)))
 
 (sera:-> settings-dialog
          (gtk-window unsigned-byte unsigned-byte)
@@ -96,7 +124,7 @@
       (mapc #'gtk-widget-queue-draw areas)))
   (values))
 
-(defun open-document (document window-callback &key (pathname #p""))
+(defun open-document (document window-callback &key pathname)
   (let* ((window (make-instance 'gtk-window
                                 :title          "cl-beads"
                                 :default-width  600
@@ -190,20 +218,17 @@
        open-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (let ((pathname (open-dialog window)))
-           (when pathname
-             (handler-case
-                 (open-document (read-jbb pathname) window-callback :pathname pathname)
-               (error (c)
-                 ;; TODO: Do something
-                 (princ c)))))))
+         (multiple-value-bind (document pathname)
+             (open-dialog window)
+           (when document
+             (open-document document window-callback :pathname pathname)))))
       (g-signal-connect
        save-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         ;; TODO: Else branch
-         (when pathname
-           (write-jbb document pathname)))))
+         (if pathname
+             (write-jbb document pathname)
+             (save-dialog window document)))))
 
     (let ((edit-box (make-instance 'gtk-hbox))
           (undo-button (make-stock-button "edit-undo"))
@@ -299,6 +324,31 @@
       (gtk-menu-shell-append submenu item-file-quit)
 
       ;; Handlers
+      (g-signal-connect
+       item-file-new "activate"
+       (lambda (widget)
+         (declare (ignore widget))
+         (open-document (make-instance 'document) window-callback)))
+      (g-signal-connect
+       item-file-open "activate"
+       (lambda (widget)
+         (declare (ignore widget))
+         (multiple-value-bind (document pathname)
+             (open-dialog window)
+           (when document
+             (open-document document window-callback :pathname pathname)))))
+      (g-signal-connect
+       item-file-save "activate"
+       (lambda (widget)
+         (declare (ignore widget))
+         (if pathname
+             (write-jbb document pathname)
+             (save-dialog window document))))
+      (g-signal-connect
+       item-file-save-as "activate"
+       (lambda (widget)
+         (declare (ignore widget))
+         (save-dialog window document pathname)))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)
