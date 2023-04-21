@@ -13,6 +13,7 @@
 (sera:-> read-jbb ((or pathname string))
          (values document &optional))
 (defun read-jbb (pathname)
+  "Read a document from JBead file format."
   (let ((content (uiop:safe-read-file-form
                   pathname
                   :package :cl-beads-jbb)))
@@ -51,6 +52,7 @@
 (sera:-> write-jbb (document (or pathname string))
          (values list &optional))
 (defun write-jbb (document pathname)
+  "Write a document to JBead file format"
   (let ((form `(cl-beads-jbb::jbb
                 (cl-beads-jbb::version 1)
                 (cl-beads-jbb::author       ,(document-author       document))

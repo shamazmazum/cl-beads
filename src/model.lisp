@@ -9,7 +9,9 @@ width of a drawing area.")
   ((document :type     document
              :reader   scheme-model-document
              :initarg  :document
-             :initform (error "Specify document"))))
+             :initform (error "Specify document")))
+  (:documentation "A generic class for scheme models (things which
+control how a scheme is represented in SCHEME-AREA widget)."))
 
 (sera:defconstructor rect
   (x      double-float)
@@ -22,10 +24,14 @@ width of a drawing area.")
 document returning a pair (RECT . COLOR)."))
 
 (defgeneric estimate-height (model)
-  (:documentation "Get estimated height of a scheme in user corrdinate
-system."))
+  (:documentation "Get estimated height of a scheme in the user
+corrdinate system. The user coordinate system spans from left (0) to
+right (1) and from bottom (0) to top (x) such as a bead is represented
+as a square."))
 
 (defun bead-size (width)
+  "Get size of a bead in user coordinated. WIDTH is a number of beads
+in a row"
   (min *maximum-bead-size*
        (float (/ width) 0d0)))
 
@@ -38,7 +44,8 @@ system."))
 
 ;; Draft
 (defclass draft-model (scheme-model)
-  ())
+  ()
+  (:documentation "A model where each row has the same number of beads."))
 
 (defmethod beads-iterator ((model draft-model))
   (let* ((document (scheme-model-document model))
@@ -61,7 +68,8 @@ system."))
 
 ;; Dummy
 (defclass dummy-model (scheme-model)
-  ())
+  ()
+  (:documentation "This model does not show any beads at all."))
 
 (defmethod beads-iterator ((model dummy-model))
   (si:list->iterator nil))
@@ -71,7 +79,9 @@ system."))
 
 ;; Corrected
 (defclass corrected-model (scheme-model)
-  ())
+  ()
+  (:documentation "This model represents what you must actually weave
+with a crochet (I suppose. I never used that technique.) or a needle."))
 
 (defmethod beads-iterator ((model corrected-model))
   (let* ((document (scheme-model-document model))
@@ -96,3 +106,8 @@ system."))
           (palette-color
            document (row-major-aref scheme idx)))))
      (si:range 0 (array-total-size scheme)))))
+
+;; TODO: Simulated
+(defclass simulated-model (dummy-model)
+  ()
+  (:documentation "This is what the result looks like."))

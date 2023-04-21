@@ -26,6 +26,7 @@
 (deftype palette () '(simple-array color (*)))
 (deftype scheme () '(simple-array unsigned-byte (* *)))
 
+;; Taken from JBead
 (defparameter *initial-palette*
   (map
    '(vector color) #'identity 
@@ -62,7 +63,7 @@
     (COLOR 0.22745098039215686d0 0.27450980392156865d0 0.33725490196078434d0)
     (COLOR 0.14901960784313725d0 0.20392156862745098d0 0.21568627450980393d0)
     (COLOR 0.0d0 0.0d0 0.0d0)))
-  "Initial palette colors for a newly created document.")
+  "Initial palette for a newly created document.")
 
 (defparameter *default-width* 15
   "Initial width of the scheme.")

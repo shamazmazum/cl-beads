@@ -7,11 +7,14 @@
                  :accessor palette-button-color)
    (css-provider :initform (gtk-css-provider-new)
                  :reader palette-button-css-provider))
-  (:metaclass gobject-class))
+  (:metaclass gobject-class)
+  (:documentation "A widget much like gtk-color-button, but more
+suitable for a palette."))
 
 (sera:-> button-css (color)
          (values string &optional))
 (defun button-css (color)
+  "Return CSS for a button with a color COLOR."
   (let ((css-color (format nil "#~@{~2,'0x~}"
                            (floor (* 255 (color-r color)))
                            (floor (* 255 (color-g color)))
@@ -21,6 +24,7 @@
 (sera:-> update-css (palette-button)
          (values &optional))
 (defun update-css (button)
+  "Update visual appearance of BUTTON."
   (gtk-css-provider-load-from-data
    (palette-button-css-provider button)
    (button-css (palette-button-color button)))
@@ -29,6 +33,8 @@
 (sera:-> choose-color (palette-button)
          (values &optional))
 (defun choose-color (button)
+  "Run a color chooser dialog and emit \"my-color-set\" signal if
+BUTTON changes its color."
   (let* ((color-chooser (make-instance 'gtk-color-chooser-dialog
                                        :title "Pick a color"
                                        :rgba (color->gdk-rgba (palette-button-color button))
@@ -49,7 +55,7 @@
      +gtk-style-provider-priority-user+))
   (update-css button)
 
-  ;; Color choser dialog
+  ;; Context menu
   (g-signal-connect
    button "button-press-event"
    (lambda (widget event)
@@ -60,11 +66,13 @@
              (choose-color   (make-instance 'gtk-menu-item :label "Choose color"))
              (set-background (make-instance 'gtk-menu-item :label "Set as background")))
 
+         ;; Run color chooser dialog
          (g-signal-connect
           choose-color "activate"
           (lambda (widget)
             (declare (ignore widget))
             (choose-color button)))
+         ;; Request a background swap
          (g-signal-connect
           set-background "activate"
           (lambda (widget)

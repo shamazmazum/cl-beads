@@ -15,6 +15,8 @@
         (current-color document)))
 
 (defun open-dialog (parent)
+  "Run 'Open Document' dialog and maybe load a document. Return the
+document and its pathname."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Open Document"
                  parent
@@ -41,6 +43,9 @@
             nil))))))
 
 (defun save-dialog (parent document &optional filename)
+  "Run 'Save Document' dialog and maybe save the document. If the
+document's pathname is known, it can be passed as an optional
+argument."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Save Document"
                  parent
@@ -65,6 +70,9 @@
          (gtk-window unsigned-byte unsigned-byte)
          (values unsigned-byte unsigned-byte boolean &optional))
 (defun settings-dialog (parent width height)
+  "Run settings dialog and return the new width and height of the
+scheme. The third returned value is a boolean indicating if settings
+were changed."
   (flet ((make-spin-button (adjustment)
            (make-instance 'gtk-spin-button
                           :orientation :horizontal
@@ -111,9 +119,11 @@
         (gtk-widget-destroy dialog)
       (values width height (eq response :ok))))))
 
-(sera:-> exec-settings-and-update (gtk-window document &rest scheme-area)
+(sera:-> exec-settings-and-update (gtk-window document list)
          (values &optional))
-(defun exec-settings-and-update (parent document &rest areas)
+(defun exec-settings-and-update (parent document areas)
+  "Run settings dialog and update the document (and redraw
+SCHEME-AREAs) if needed."
   (multiple-value-bind (width height changedp)
       (settings-dialog
        parent
@@ -125,28 +135,33 @@
   (values))
 
 (defun open-document (document window-callback &key pathname)
-  (let* ((window (make-instance 'gtk-window
-                                :title          "cl-beads"
-                                :default-width  600
-                                :default-height 800))
+  "Open a document in a new window. PATHNAME is a path associated with
+the document (if exists, i.e. the document is not a new
+document). WINDOW-CALLBACK is a callback which is called when the
+document's window is created or destroyed."
+  (let ((window (make-instance 'gtk-window
+                               :title          "cl-beads"
+                               :default-width  600
+                               :default-height 800))
 
-         (menu-bar      (make-instance 'gtk-menu-bar))
-         (workspace-box (make-instance 'gtk-hbox))
-         (toolbar-box   (make-instance 'gtk-hbox))
-         (main-box      (make-instance 'gtk-vbox))
+        (menu-bar      (make-instance 'gtk-menu-bar))
+        (workspace-box (make-instance 'gtk-hbox))
+        (toolbar-box   (make-instance 'gtk-hbox))
+        (main-box      (make-instance 'gtk-vbox))
 
-         (draft-area      (make-instance 'scheme-area
-                                         :width-request 160
-                                         :model (make-instance 'draft-model :document document)))
-         (corrected-area  (make-instance 'scheme-area
-                                         :width-request 160
-                                         :model (make-instance 'corrected-model :document document)))
-         (simulation-area (make-instance 'scheme-area
-                                         :width-request 160
-                                         :model (make-instance 'dummy-model :document document)))
-         (all-areas (list draft-area corrected-area simulation-area)))
+        (scheme-areas
+         (list (make-instance 'scheme-area
+                              :width-request 160
+                              :model (make-instance 'draft-model :document document))
+               (make-instance 'scheme-area
+                              :width-request 160
+                              :model (make-instance 'corrected-model :document document))
+               (make-instance 'scheme-area
+                              :width-request 160
+                              :model (make-instance 'simulated-model :document document)))))
 
-    (dolist (area all-areas)
+    ;; Clicking on a bead handling
+    (dolist (area scheme-areas)
       (g-signal-connect
        area "my-bead-clicked"
        (lambda (widget bead-idx)
@@ -157,16 +172,17 @@
              (symbol-macrolet ((bead (row-major-aref (document-scheme document) bead-idx)))
                (setf bead (if (= bead current-color) 0 current-color))))
            ;; TODO: Redraw only a small area
-           (mapc #'gtk-widget-queue-draw all-areas)))))
+           (mapc #'gtk-widget-queue-draw scheme-areas)))))
 
+    ;; Call WINDOW-CALLBACK when the window is closed
     (g-signal-connect window "destroy" (alex:curry window-callback :close))
 
+    ;; A frame with three drawing areas and a scroller
     (let ((frame-box     (make-instance 'gtk-vbox))
           (frame         (make-instance 'gtk-frame :width-request 600)))
       (let ((drawing-box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start drawing-box draft-area      :padding 20)
-        (gtk-box-pack-start drawing-box corrected-area  :padding 20)
-        (gtk-box-pack-start drawing-box simulation-area :padding 20)
+        (dolist (area scheme-areas)
+          (gtk-box-pack-start drawing-box area :padding 20))
         (gtk-box-pack-start frame-box drawing-box))
       (let ((label-box (make-instance 'gtk-hbox)))
         (gtk-box-pack-start
@@ -188,7 +204,7 @@
          adjustment "value-changed"
          (lambda (object)
            (declare (ignore object))
-           (dolist (area all-areas)
+           (dolist (area scheme-areas)
              (setf (scheme-area-position area)
                    (- 1 (gtk-adjustment-value adjustment))))))
 
@@ -200,6 +216,7 @@
          :expand nil))
       (gtk-box-pack-start workspace-box frame :expand nil))
 
+    ;; New / Open / Save buttons 
     (let ((document-box (make-instance 'gtk-hbox))
           (new-button  (make-stock-button "document-new"))
           (open-button (make-stock-button "document-open"))
@@ -230,6 +247,7 @@
              (write-jbb document pathname)
              (save-dialog window document)))))
 
+    ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
           (undo-button (make-stock-button "edit-undo"))
           (redo-button (make-stock-button "edit-redo")))
@@ -237,6 +255,7 @@
       (gtk-box-pack-start edit-box redo-button :expand nil)
       (gtk-box-pack-start toolbar-box edit-box :expand nil :padding 5))
 
+    ;; Settings button
     (let ((settings-box (make-instance 'gtk-hbox))
           (pref-button (make-stock-button "gtk-preferences")))
 
@@ -244,13 +263,12 @@
        pref-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (exec-settings-and-update
-          window document
-          draft-area corrected-area simulation-area)))
+         (exec-settings-and-update window document scheme-areas)))
 
       (gtk-box-pack-start settings-box pref-button :expand nil)
       (gtk-box-pack-start toolbar-box settings-box :expand nil :padding 5))
 
+    ;; The current color button and a palette
     (let ((frame         (make-instance 'gtk-frame))
           (current-color (make-instance 'palette-button :sensitive nil))
           (grid          (make-instance 'gtk-grid
@@ -289,7 +307,7 @@
                      (palette-button-color background-button)
                      (palette-button-color color-button))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw all-areas)))
+              (mapc #'gtk-widget-queue-draw scheme-areas)))
 
            (g-signal-connect
             color-button "my-color-set"
@@ -300,14 +318,16 @@
               (when (= (document-palette-idx document) n)
                 (update-current-color current-color document))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw all-areas)))
+              (mapc #'gtk-widget-queue-draw scheme-areas)))
            background-button))
        nil (si:range 0 (palette-length document)))
 
       (gtk-box-pack-end toolbar-box current-color :expand nil)
       (gtk-container-add frame grid)
       (gtk-box-pack-end workspace-box frame))
-      
+
+    ;; Menu bar
+    ;; File menu
     (let ((item-file (make-instance 'gtk-menu-item
                                     :label "_File"
                                     :use-underline t))
@@ -358,6 +378,7 @@
       (setf (gtk-menu-item-submenu item-file) submenu)
       (gtk-menu-shell-append menu-bar item-file))
 
+    ;; Edit menu
     (let ((item-edit (make-instance 'gtk-menu-item
                                     :label "_Edit"
                                     :use-underline t))
@@ -369,6 +390,7 @@
       (setf (gtk-menu-item-submenu item-edit) submenu)
       (gtk-menu-shell-append menu-bar item-edit))
 
+    ;; Setting menu
     (let ((item-settings (make-instance 'gtk-menu-item
                                         :label "_Settings"
                                         :use-underline t))
@@ -379,14 +401,13 @@
        item-settings-pref "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (exec-settings-and-update
-          window document
-          draft-area corrected-area simulation-area)))
+         (exec-settings-and-update window document scheme-areas)))
 
       (gtk-menu-shell-append submenu item-settings-pref)
       (setf (gtk-menu-item-submenu item-settings) submenu)
       (gtk-menu-shell-append menu-bar item-settings))
 
+    ;; Pack everyting and call the callback
     (gtk-box-pack-start main-box menu-bar :expand nil)
     (gtk-box-pack-start main-box toolbar-box :expand nil)
     (gtk-box-pack-end   main-box workspace-box :padding 10)
@@ -396,6 +417,7 @@
     window))
 
 (defun run ()
+  "Run cl-beads. Use this function from the REPL."
   (within-main-loop
     (let (windows)
       (flet ((callback (action window)

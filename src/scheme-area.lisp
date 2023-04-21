@@ -19,9 +19,13 @@
    (coord-trans   :initform (cairo-matrix-init-identity)
                   :type     list
                   :accessor scheme-area-coord-trans))
-  (:metaclass gobject-class))
+  (:metaclass gobject-class)
+  (:documentation "Widget which shows a scheme (via a model) and
+allows drawing on it."))
 
 (defun draw-bead (ctx rect color)
+  "Draw a bead with position RECT and color COLOR on a cairo context
+CTX."
   (flet ((draw-rect ()
            (cairo-rectangle
             ctx
@@ -40,7 +44,9 @@
     (draw-rect)
     (cairo-stroke ctx)))
 
+;; Bring this function from GTK4
 (defun gdk-rectangle-contains-point (rect x y)
+  "Test if a point (X, Y) is contained in a rectangle RECT."
   (let ((rect-x      (gdk-rectangle-x      rect))
         (rect-y      (gdk-rectangle-y      rect))
         (rect-width  (gdk-rectangle-width  rect))
@@ -64,6 +70,7 @@
       model))))
 
 (defun setup-coordinate-system (ctx scheme-area scheme-height)
+  "Setup user to screen coordinate system transform."
   (let* ((allocation (gtk-widget-get-allocation scheme-area))
          (width  (float (gdk-rectangle-width  allocation) 0d0))
          (height (float (gdk-rectangle-height allocation) 0d0))
@@ -79,7 +86,7 @@
            (scheme-area-position scheme-area))))))
 
 (defun draw-scheme (widget ctx)
-  "Stub for drawing the scheme"
+  "Draw a scheme on a scheme-area widget."
   (let ((ctx (pointer ctx))
         (allocation (gtk-widget-get-allocation widget))
         (model (scheme-area-model widget)))
@@ -105,6 +112,8 @@
         (draw-bead ctx rect color)))))
 
 (defun button-clicked (widget event)
+  "Handle button click on a scheme-area. If clicked on a bead, reemit
+as \"my-bead-clicked\"."
   (when (= (gdk-event-button-button event) 1)
     (let ((allocation (gtk-widget-get-allocation widget))
           (model (scheme-area-model widget)))
