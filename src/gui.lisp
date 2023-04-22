@@ -147,18 +147,18 @@ document's window is created or destroyed."
 
         (scheme-areas
          (list (make-instance 'scheme-area
-                              :width-request 160
+                              :width-request 200
                               :valign        :fill
                               :vexpand       t
                               :draw-ruler-p  t
                               :model         (make-instance 'draft-model :document document))
                (make-instance 'scheme-area
-                              :width-request 160
+                              :width-request 200
                               :valign        :fill
                               :vexpand       t
                               :model         (make-instance 'corrected-model :document document))
                (make-instance 'scheme-area
-                              :width-request 160
+                              :width-request 200
                               :valign        :fill
                               :vexpand       t
                               :model         (make-instance 'simulated-model :document document))))
@@ -214,7 +214,7 @@ document's window is created or destroyed."
 
     ;; A frame with three drawing areas
     (let ((frame-grid    (make-instance 'gtk-grid))
-          (frame         (make-instance 'gtk-frame :width-request 600)))
+          (frame         (make-instance 'gtk-frame)))
       (setf (gtk-grid-column-spacing frame-grid) 20)
       (loop for area in scheme-areas
             for x from 0 by 1 do
