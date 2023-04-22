@@ -272,6 +272,8 @@ document's window is created or destroyed."
       (gtk-toggle-button-set-mode pencil       nil)
       (gtk-toggle-button-set-mode color-picker nil)
       (setf (gtk-button-image pencil)
+            ;; Converted from this file:
+            ;; https://commons.wikimedia.org/wiki/File:Antu_document-edit-sign.svg
             (gtk-image-new-from-file
              (namestring (asdf:system-relative-pathname :cl-beads "pencil.png")))
             (gtk-button-image color-picker)
