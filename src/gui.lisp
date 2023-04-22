@@ -10,10 +10,6 @@
                  :use-underline t
                  :use-stock     t))
 
-(defun update-current-color (color-button document)
-  (setf (palette-button-color color-button)
-        (current-color document)))
-
 (defun open-dialog (parent)
   "Run 'Open Document' dialog and maybe load a document. Return the
 document and its pathname."
@@ -158,7 +154,11 @@ document's window is created or destroyed."
                               :model (make-instance 'corrected-model :document document))
                (make-instance 'scheme-area
                               :width-request 160
-                              :model (make-instance 'simulated-model :document document)))))
+                              :model (make-instance 'simulated-model :document document))))
+
+        (active-tool :pencil)
+        (current-color (make-instance 'palette-button :sensitive nil)))
+    (declare (type (member :pencil :color-picker) active-tool))
 
     ;; Clicking on a bead handling
     (dolist (area scheme-areas)
@@ -168,11 +168,17 @@ document's window is created or destroyed."
          (declare (ignore widget))
          (when (< bead-idx (array-total-size (document-scheme document)))
            ;; How can it be otherwise?
-           (let ((current-color (document-palette-idx document)))
-             (symbol-macrolet ((bead (row-major-aref (document-scheme document) bead-idx)))
-               (setf bead (if (= bead current-color) 0 current-color))))
-           ;; TODO: Redraw only a small area
-           (mapc #'gtk-widget-queue-draw scheme-areas)))))
+           (symbol-macrolet ((bead-color (row-major-aref (document-scheme document) bead-idx)))
+             (ecase active-tool
+               (:pencil
+                (let ((current-color (document-palette-idx document)))
+                  (setf bead-color (if (= bead-color current-color) 0 current-color)))
+                ;; TODO: Redraw only a small area
+                (mapc #'gtk-widget-queue-draw scheme-areas))
+               (:color-picker
+                (setf (document-palette-idx document) bead-color
+                      (palette-button-color current-color)
+                      (current-color document)))))))))
 
     ;; Call WINDOW-CALLBACK when the window is closed
     (g-signal-connect window "destroy" (alex:curry window-callback :close))
@@ -255,6 +261,33 @@ document's window is created or destroyed."
       (gtk-box-pack-start edit-box redo-button :expand nil)
       (gtk-box-pack-start toolbar-box edit-box :expand nil :padding 5))
 
+    ;; Tools (Pencil / Color pick) buttons
+    (let* ((tools-box (make-instance 'gtk-hbox))
+           (pencil (gtk-radio-button-new nil))
+           (color-picker (gtk-radio-button-new-from-widget pencil)))
+      (gtk-toggle-button-set-mode pencil       nil)
+      (gtk-toggle-button-set-mode color-picker nil)
+      (setf (gtk-button-image pencil)
+            (gtk-image-new-from-file
+             (namestring (asdf:system-relative-pathname :cl-beads "pencil.png")))
+            (gtk-button-image color-picker)
+            (gtk-image-new-from-icon-name "gtk-color-picker" :large-toolbar))
+
+      (dolist (button (list pencil color-picker))
+        (g-signal-connect
+         button "toggled"
+         (lambda (widget)
+           (when (gtk-toggle-button-active widget)
+             (cond
+               ((eq widget pencil)
+                (setq active-tool :pencil))
+               ((eq widget color-picker)
+                (setq active-tool :color-picker)))))))
+
+      (gtk-box-pack-start tools-box pencil       :expand nil)
+      (gtk-box-pack-start tools-box color-picker :expand nil)
+      (gtk-box-pack-start toolbar-box tools-box  :expand nil))
+
     ;; Settings button
     (let ((settings-box (make-instance 'gtk-hbox))
           (pref-button (make-stock-button "gtk-preferences")))
@@ -268,14 +301,13 @@ document's window is created or destroyed."
       (gtk-box-pack-start settings-box pref-button :expand nil)
       (gtk-box-pack-start toolbar-box settings-box :expand nil :padding 5))
 
-    ;; The current color button and a palette
-    (let ((frame         (make-instance 'gtk-frame))
-          (current-color (make-instance 'palette-button :sensitive nil))
-          (grid          (make-instance 'gtk-grid
-                                        :row-homogeneous    t
-                                        :column-homogeneous t
-                                        :valign             :end
-                                        :halign             :end)))
+    ;; Palette
+    (let ((frame (make-instance 'gtk-frame))
+          (grid  (make-instance 'gtk-grid
+                                :row-homogeneous    t
+                                :column-homogeneous t
+                                :valign             :end
+                                :halign             :end)))
       (si:foldl
        (lambda (background-button n)
          (let* ((color-button (make-instance 'palette-button
@@ -289,8 +321,9 @@ document's window is created or destroyed."
             color-button "clicked"
             (lambda (widget)
               (declare (ignore widget))
-              (setf (document-palette-idx document) n)
-              (update-current-color current-color document)))
+              (setf (document-palette-idx document) n
+                    (palette-button-color current-color)
+                    (current-color document))))
 
            (g-signal-connect
             color-button "my-background-change-request"
@@ -316,7 +349,8 @@ document's window is created or destroyed."
               (setf (palette-color document n)
                     (palette-button-color color-button))
               (when (= (document-palette-idx document) n)
-                (update-current-color current-color document))
+                (setf (palette-button-color current-color)
+                      (current-color document)))
               ;; Redraw areas
               (mapc #'gtk-widget-queue-draw scheme-areas)))
            background-button))
