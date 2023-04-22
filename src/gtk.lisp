@@ -12,9 +12,8 @@
 
 (defun gtk-css-provider-load-from-data (css-provider data)
   (with-g-error (err)
-    (+ (%gtk-css-provider-load-from-data
-        css-provider data (length data) err)
-       "sasa")))
+    (%gtk-css-provider-load-from-data
+     css-provider data (length data) err)))
 (export 'gtk-css-provider-load-from-data)
 
 (defcfun ("gtk_render_background" %gtk-render-background) :void
