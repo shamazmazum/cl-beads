@@ -150,6 +150,7 @@ document's window is created or destroyed."
                               :width-request 160
                               :valign        :fill
                               :vexpand       t
+                              :draw-ruler-p  t
                               :model         (make-instance 'draft-model :document document))
                (make-instance 'scheme-area
                               :width-request 160

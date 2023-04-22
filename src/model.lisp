@@ -29,18 +29,18 @@ corrdinate system. The user coordinate system spans from left (0) to
 right (1) and from bottom (0) to top (x) such as a bead is represented
 as a square."))
 
-(defun bead-size (width)
-  "Get size of a bead in user coordinated. WIDTH is a number of beads
-in a row"
-  (min *maximum-bead-size*
-       (float (/ width) 0d0)))
+(defgeneric bead-size (model)
+  (:documentation "Get size of a bead for this model in user coordinates."))
+
+(defmethod bead-size ((model scheme-model))
+  (let ((document (scheme-model-document model)))
+    (min *maximum-bead-size*
+         (float (/ (document-width document)) 0d0))))
 
 (defmethod estimate-height ((model scheme-model))
-  (let* ((document (scheme-model-document model))
-         (width  (document-width  document))
-         (height (document-height document))
-         (bead-size (bead-size width)))
-    (* bead-size height)))
+  (let ((document (scheme-model-document model)))
+    (* (bead-size model)
+       (document-height document))))
 
 ;; Draft
 (defclass draft-model (scheme-model)
@@ -52,7 +52,7 @@ in a row"
          (width  (document-width  document))
          (height (document-height document))
          (scheme (document-scheme document))
-         (bead-size (bead-size width))
+         (bead-size (bead-size model))
          (offset (/ (- 1 (* bead-size width)) 2)))
     (si:imap
      (lambda (coord)
@@ -87,7 +87,7 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
   (let* ((document (scheme-model-document model))
          (width  (document-width  document))
          (scheme (document-scheme document))
-         (bead-size (bead-size (1+ width)))
+         (bead-size (bead-size model))
          (offset (/ (- 1 (* bead-size (1+ width))) 2)))
     (si:imap
      (lambda (idx)
@@ -106,6 +106,11 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
           (palette-color
            document (row-major-aref scheme idx)))))
      (si:range 0 (array-total-size scheme)))))
+
+(defmethod bead-size ((model corrected-model))
+  (let ((document (scheme-model-document model)))
+    (min *maximum-bead-size*
+         (float (/ (1+ (document-width document))) 0d0))))
 
 ;; TODO: Simulated
 (defclass simulated-model (dummy-model)

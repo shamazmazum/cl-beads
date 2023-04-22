@@ -3,6 +3,9 @@
 (defparameter *outline-width* 1d-2
   "Default outline width for a bead.")
 
+(defparameter *ruler-spacing* 10
+  "Default ruler spacing value (in number of beads)")
+
 (defclass scheme-area (gtk-drawing-area)
   ((model         :initform (error "Specify model")
                   :initarg  :model
@@ -12,6 +15,14 @@
                   :initarg  :outline-width
                   :type     double-float
                   :accessor scheme-area-outline-width)
+   (ruler-spacing :initform *ruler-spacing*
+                  :initarg  :ruler-spacing
+                  :type     unsigned-byte
+                  :accessor scheme-area-ruler-spacing)
+   (draw-ruler-p  :initform nil
+                  :initarg  :draw-ruler-p
+                  :type     boolean
+                  :accessor scheme-area-draw-ruler-p)
    (position      :initform 0d0
                   :initarg  :position
                   :type     double-float
@@ -40,7 +51,7 @@ CTX."
      (color-b color))
     (draw-rect)
     (cairo-fill ctx)
-    (cairo-set-source-rgb ctx 0.0 0.0 0.0)
+    (cairo-set-source-rgb ctx 0 0 0)
     (draw-rect)
     (cairo-stroke ctx)))
 
@@ -56,18 +67,23 @@ CTX."
      (<= rect-y y (+ rect-y rect-height)))))
 
 ;; Is it really useful?
-(defun filter-visible (ctx allocation model)
-  (flet ((visible (bead)
+(defun point-visible-p (ctx allocation x y)
+  (multiple-value-bind (x-dev y-dev)
+      (cairo-user-to-device ctx x y)
+    (gdk-rectangle-contains-point allocation x-dev y-dev)))
+
+(defun filter-visible-beads (ctx allocation iterator)
+  (flet ((bead-visible-p (bead)
            (destructuring-bind (rect . color) bead
              (declare (ignore color))
-             (multiple-value-bind (x-start y-start)
-                 (cairo-user-to-device ctx (rect-x rect) (rect-y rect))
-               (gdk-rectangle-contains-point allocation x-start y-start)))))
+             (point-visible-p ctx allocation
+                              (rect-x rect)
+                              (rect-y rect)))))
     (si:take-while
-     #'visible
+     #'bead-visible-p
      (si:drop-while
-      (alex:compose #'not #'visible)
-      model))))
+      (alex:compose #'not #'bead-visible-p)
+      iterator))))
 
 (defun setup-coordinate-system (ctx scheme-area scheme-height)
   "Setup user to screen coordinate system transform."
@@ -107,9 +123,21 @@ CTX."
     ;; Set line width
     (cairo-set-line-width ctx (scheme-area-outline-width widget))
 
-    (si:do-iterator (bead (filter-visible ctx allocation (beads-iterator model)))
+    ;; Draw beads
+    (si:do-iterator (bead (filter-visible-beads ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
-        (draw-bead ctx rect color)))))
+        (draw-bead ctx rect color)))
+
+    ;; Emphasize rows
+    (when (scheme-area-draw-ruler-p widget)
+      (cairo-set-source-rgb ctx 0 0 0)
+      (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
+      (loop for y from 0d0 below (estimate-height model)
+            by (* (scheme-area-ruler-spacing widget) (bead-size model))
+            when (point-visible-p ctx allocation 0 y) do
+            (cairo-move-to ctx 0 y)
+            (cairo-line-to ctx 1 y)
+            (cairo-stroke ctx)))))
 
 (defun button-clicked (widget event)
   "Handle button click on a scheme-area. If clicked on a bead, reemit
