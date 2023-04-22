@@ -1,4 +1,5 @@
 # cl-beads
+[![CI build](https://github.com/shamazmazum/cl-beads/actions/workflows/build.yml/badge.svg)](https://github.com/shamazmazum/cl-beads/actions/workflows/build.yml)
 
 ## What is it?
 
