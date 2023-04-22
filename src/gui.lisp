@@ -148,13 +148,19 @@ document's window is created or destroyed."
         (scheme-areas
          (list (make-instance 'scheme-area
                               :width-request 160
-                              :model (make-instance 'draft-model :document document))
+                              :valign        :fill
+                              :vexpand       t
+                              :model         (make-instance 'draft-model :document document))
                (make-instance 'scheme-area
                               :width-request 160
-                              :model (make-instance 'corrected-model :document document))
+                              :valign        :fill
+                              :vexpand       t
+                              :model         (make-instance 'corrected-model :document document))
                (make-instance 'scheme-area
                               :width-request 160
-                              :model (make-instance 'simulated-model :document document))))
+                              :valign        :fill
+                              :vexpand       t
+                              :model         (make-instance 'simulated-model :document document))))
 
         (active-tool :pencil)
         (current-color (make-instance 'palette-button :sensitive nil)))
@@ -183,43 +189,40 @@ document's window is created or destroyed."
     ;; Call WINDOW-CALLBACK when the window is closed
     (g-signal-connect window "destroy" (alex:curry window-callback :close))
 
-    ;; A frame with three drawing areas and a scroller
-    (let ((frame-box     (make-instance 'gtk-vbox))
+    ;; A scroll bar
+    (let ((adjustment (make-instance 'gtk-adjustment
+                                     :lower 0.0
+                                     :value 1.0
+                                     :upper 1.0
+                                     :step-increment 0.02
+                                     :page-increment 0.2)))
+      (g-signal-connect
+       adjustment "value-changed"
+       (lambda (object)
+         (declare (ignore object))
+         (dolist (area scheme-areas)
+           (setf (scheme-area-position area)
+                 (- 1 (gtk-adjustment-value adjustment))))))
+
+      (gtk-box-pack-start
+       workspace-box
+       (make-instance 'gtk-scrollbar
+                      :orientation :vertical
+                      :adjustment  adjustment)
+       :expand nil))
+
+    ;; A frame with three drawing areas
+    (let ((frame-grid    (make-instance 'gtk-grid))
           (frame         (make-instance 'gtk-frame :width-request 600)))
-      (let ((drawing-box (make-instance 'gtk-hbox)))
-        (dolist (area scheme-areas)
-          (gtk-box-pack-start drawing-box area :padding 20))
-        (gtk-box-pack-start frame-box drawing-box))
-      (let ((label-box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start
-         label-box (make-instance 'gtk-label :label "Draft")      :padding 20)
-        (gtk-box-pack-start
-         label-box (make-instance 'gtk-label :label "Corrected")  :padding 20)
-        (gtk-box-pack-start
-         label-box (make-instance 'gtk-label :label "Simulation") :padding 20)
-        (gtk-box-pack-end frame-box label-box :expand nil))
-      (gtk-container-add frame frame-box)
-
-      (let ((adjustment (make-instance 'gtk-adjustment
-                                       :lower 0.0
-                                       :value 1.0
-                                       :upper 1.0
-                                       :step-increment 0.02
-                                       :page-increment 0.2)))
-        (g-signal-connect
-         adjustment "value-changed"
-         (lambda (object)
-           (declare (ignore object))
-           (dolist (area scheme-areas)
-             (setf (scheme-area-position area)
-                   (- 1 (gtk-adjustment-value adjustment))))))
-
-        (gtk-box-pack-start
-         workspace-box
-         (make-instance 'gtk-scrollbar
-                        :orientation :vertical
-                        :adjustment  adjustment)
-         :expand nil))
+      (setf (gtk-grid-column-spacing frame-grid) 20)
+      (loop for area in scheme-areas
+            for x from 0 by 1 do
+            (gtk-grid-attach frame-grid area x 0 1 1))
+      (loop for label in '("Draft" "Corrected" "Simulation")
+            for x from 0 by 1 do
+            (gtk-grid-attach frame-grid (make-instance 'gtk-label :label label)
+                             x 1 1 1))
+      (gtk-container-add frame frame-grid)
       (gtk-box-pack-start workspace-box frame :expand nil))
 
     ;; New / Open / Save buttons 
