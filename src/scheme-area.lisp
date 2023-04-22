@@ -158,8 +158,7 @@ as \"my-bead-clicked\"."
                  (si:drop-while
                   (lambda (bead)
                     (destructuring-bind (n rect . color) bead
-                      (declare (ignore color)
-                               (ignorable n rect))
+                      (declare (ignore color n))
                       (not
                        (and
                         (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
