@@ -16,4 +16,4 @@ jobs:
           ros -e '(ql-dist:install-dist "http://dist.ultralisp.org/" :prompt nil)'
       - name: Build
         run: |
-          ros -l cl-bead -e '(uiop:quit)'
+          ros -s cl-bead -e '(uiop:quit)'
