@@ -34,7 +34,7 @@ Then run a produced binary.
 
 * Simulation view
 * Some report maybe?
-* Quit confirmation
+* ~~Quit confirmation~~
 * Changing color for a range of beads
 * Edit history
 * Change color for outline of a bead

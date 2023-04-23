@@ -140,6 +140,10 @@ SCHEME-AREAs) if needed."
    (active-tool :initform :pencil
                 :type     (member :pencil :color-picker)
                 :accessor state-active-tool)
+   (dirtyp      :initform nil
+                :type     boolean
+                :accessor state-dirty-p
+                :documentation "If the document is edited but not saved")
    (callback    :initarg  :callback
                 :reader   state-callback
                 :documentation "Callback called on window destruction and creation")))
@@ -168,13 +172,36 @@ SCHEME-AREAs) if needed."
                    parent document
                    (state-pathname state))))
     (when pathname
-      (setf (state-pathname state) pathname)
+      (setf (state-pathname state) pathname
+            (state-dirty-p   state) nil)
       (set-window-title parent pathname))))
 
 (defun save-handler (parent state document widget)
-  (if (state-pathname state)
-      (write-jbb document (state-pathname state))
-      (save-as-handler parent state document widget)))
+  (cond
+    ((state-pathname state)
+     (write-jbb document (state-pathname state))
+     (setf (state-dirty-p state) nil))
+    (t
+     (save-as-handler parent state document widget))))
+
+(defun quit-dialog (parent)
+  "Ask if we should close the window. Return T if we should."
+  (let* ((dialog (gtk-dialog-new-with-buttons
+                  "Are you sure?"
+                  parent
+                  nil
+                  "gtk-ok" :accept
+                  "gtk-cancel" :reject))
+         (content-area (gtk-dialog-get-content-area dialog)))
+    (gtk-container-add
+     content-area
+     (make-instance 'gtk-label
+                    :label  "There are unsaved changes. Are you sure you want to quit?"))
+    (setf (gtk-container-border-width content-area) 12)
+    (gtk-widget-show-all content-area)
+    (prog1
+        (eq (gtk-dialog-run dialog) :accept)
+    (gtk-widget-destroy dialog))))
 
 (defun open-document (document window-callback &key pathname)
   "Open a document in a new window. PATHNAME is a path associated with
@@ -213,7 +240,7 @@ document's window is created or destroyed."
                               :pathname pathname
                               :callback window-callback)))
 
-    ;; Clicking on a bead handling
+    ;; Handle click on a bead
     (dolist (area scheme-areas)
       (g-signal-connect
        area "my-bead-clicked"
@@ -227,11 +254,20 @@ document's window is created or destroyed."
                 (let ((current-color (document-palette-idx document)))
                   (setf bead-color (if (= bead-color current-color) 0 current-color)))
                 ;; TODO: Redraw only a small area
-                (mapc #'gtk-widget-queue-draw scheme-areas))
+                (mapc #'gtk-widget-queue-draw scheme-areas)
+                (setf (state-dirty-p state) t))
                (:color-picker
                 (setf (document-palette-idx document) bead-color
                       (palette-button-color current-color)
                       (current-color document)))))))))
+
+    ;; Ask for a confirmation when closing a window in dirty state
+    (g-signal-connect
+     window "delete-event"
+     (lambda (widget event)
+       (declare (ignore widget event))
+       (when (state-dirty-p state)
+         (not (quit-dialog window)))))
 
     ;; Call WINDOW-CALLBACK when the window is closed
     (g-signal-connect window "destroy" (alex:curry window-callback :close))
@@ -381,7 +417,9 @@ document's window is created or destroyed."
                      (palette-button-color background-button)
                      (palette-button-color color-button))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw scheme-areas)))
+              (mapc #'gtk-widget-queue-draw scheme-areas)
+              ;; Set dirty state
+              (setf (state-dirty-p state) t)))
 
            (g-signal-connect
             color-button "my-color-set"
@@ -393,7 +431,9 @@ document's window is created or destroyed."
                 (setf (palette-button-color current-color)
                       (current-color document)))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw scheme-areas)))
+              (mapc #'gtk-widget-queue-draw scheme-areas)
+              ;; Set dirty state
+              (setf (state-dirty-p state) t)))
            background-button))
        nil (si:range 0 (palette-length document)))
 
