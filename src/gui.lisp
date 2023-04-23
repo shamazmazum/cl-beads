@@ -139,7 +139,42 @@ SCHEME-AREAs) if needed."
                 :accessor state-pathname)
    (active-tool :initform :pencil
                 :type     (member :pencil :color-picker)
-                :accessor state-active-tool)))
+                :accessor state-active-tool)
+   (callback    :initarg  :callback
+                :reader   state-callback
+                :documentation "Callback called on window destruction and creation")))
+
+(defun set-window-title (window pathname)
+  (setf (gtk-window-title window)
+        (format nil "cl-beads~@[: ~a~]" pathname)))
+
+(defun new-handler (state widget)
+  (declare (ignore widget))
+  (open-document (make-instance 'document)
+                 (state-callback state)))
+
+(defun open-handler (parent state widget)
+  (declare (ignore widget))
+  (multiple-value-bind (document pathname)
+      (open-dialog parent)
+    (when document
+      (set-window-title
+       (open-document document (state-callback state) :pathname pathname)
+       pathname))))
+
+(defun save-as-handler (parent state document widget)
+  (declare (ignore widget))
+  (let ((pathname (save-dialog
+                   parent document
+                   (state-pathname state))))
+    (when pathname
+      (setf (state-pathname state) pathname)
+      (set-window-title parent pathname))))
+
+(defun save-handler (parent state document widget)
+  (if (state-pathname state)
+      (write-jbb document (state-pathname state))
+      (save-as-handler parent state document widget)))
 
 (defun open-document (document window-callback &key pathname)
   "Open a document in a new window. PATHNAME is a path associated with
@@ -174,7 +209,9 @@ document's window is created or destroyed."
                               :vexpand       t
                               :model         (make-instance 'simulated-model :document document))))
         (current-color (make-instance 'palette-button :sensitive nil))
-        (state (make-instance 'document-state :pathname pathname)))
+        (state (make-instance 'document-state
+                              :pathname pathname
+                              :callback window-callback)))
 
     ;; Clicking on a bead handling
     (dolist (area scheme-areas)
@@ -247,25 +284,13 @@ document's window is created or destroyed."
 
       (g-signal-connect
        new-button "clicked"
-       (lambda (widget)
-         (declare (ignore widget))
-         (open-document (make-instance 'document) window-callback)))
+       (alex:curry #'new-handler state))
       (g-signal-connect
        open-button "clicked"
-       (lambda (widget)
-         (declare (ignore widget))
-         (multiple-value-bind (document pathname)
-             (open-dialog window)
-           (when document
-             (open-document document window-callback :pathname pathname)))))
+       (alex:curry #'open-handler window state))
       (g-signal-connect
        save-button "clicked"
-       (lambda (widget)
-         (declare (ignore widget))
-         (if (state-pathname state)
-             (write-jbb document (state-pathname state))
-             (setf (state-pathname state)
-                   (save-dialog window document))))))
+       (alex:curry #'save-handler window state document)))
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
@@ -398,31 +423,16 @@ document's window is created or destroyed."
       ;; Handlers
       (g-signal-connect
        item-file-new "activate"
-       (lambda (widget)
-         (declare (ignore widget))
-         (open-document (make-instance 'document) window-callback)))
+       (alex:curry #'new-handler state))
       (g-signal-connect
        item-file-open "activate"
-       (lambda (widget)
-         (declare (ignore widget))
-         (multiple-value-bind (document pathname)
-             (open-dialog window)
-           (when document
-             (open-document document window-callback :pathname pathname)))))
+       (alex:curry #'open-handler window state))
       (g-signal-connect
        item-file-save "activate"
-       (lambda (widget)
-         (declare (ignore widget))
-         (if (state-pathname state)
-             (write-jbb document (state-pathname state))
-             (setf (state-pathname state)
-                   (save-dialog window document)))))
+       (alex:curry #'save-handler window state document))
       (g-signal-connect
        item-file-save-as "activate"
-       (lambda (widget)
-         (declare (ignore widget))
-         (setf (state-pathname state)
-               (save-dialog window document (state-pathname state)))))
+       (alex:curry #'save-as-handler window state document))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)
