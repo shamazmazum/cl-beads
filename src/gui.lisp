@@ -57,10 +57,12 @@ argument."
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
 
-    (when (eq (gtk-dialog-run dialog) :accept)
-      (let ((filename (gtk-file-chooser-get-filename dialog)))
-        (write-jbb document filename)))
-    (gtk-widget-destroy dialog)))
+    (prog1
+        (when (eq (gtk-dialog-run dialog) :accept)
+          (let ((filename (gtk-file-chooser-get-filename dialog)))
+            (write-jbb document filename)
+            filename))
+      (gtk-widget-destroy dialog))))
 
 (sera:-> settings-dialog
          (gtk-window unsigned-byte unsigned-byte)
@@ -130,6 +132,15 @@ SCHEME-AREAs) if needed."
       (mapc #'gtk-widget-queue-draw areas)))
   (values))
 
+(defclass document-state ()
+  ((pathname    :initarg  :pathname
+                :initform nil
+                :type     (or null pathname string)
+                :accessor state-pathname)
+   (active-tool :initform :pencil
+                :type     (member :pencil :color-picker)
+                :accessor state-active-tool)))
+
 (defun open-document (document window-callback &key pathname)
   "Open a document in a new window. PATHNAME is a path associated with
 the document (if exists, i.e. the document is not a new
@@ -162,10 +173,8 @@ document's window is created or destroyed."
                               :valign        :fill
                               :vexpand       t
                               :model         (make-instance 'simulated-model :document document))))
-
-        (active-tool :pencil)
-        (current-color (make-instance 'palette-button :sensitive nil)))
-    (declare (type (member :pencil :color-picker) active-tool))
+        (current-color (make-instance 'palette-button :sensitive nil))
+        (state (make-instance 'document-state :pathname pathname)))
 
     ;; Clicking on a bead handling
     (dolist (area scheme-areas)
@@ -176,7 +185,7 @@ document's window is created or destroyed."
          (when (< bead-idx (array-total-size (document-scheme document)))
            ;; How can it be otherwise?
            (symbol-macrolet ((bead-color (row-major-aref (document-scheme document) bead-idx)))
-             (ecase active-tool
+             (ecase (state-active-tool state)
                (:pencil
                 (let ((current-color (document-palette-idx document)))
                   (setf bead-color (if (= bead-color current-color) 0 current-color)))
@@ -253,9 +262,10 @@ document's window is created or destroyed."
        save-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (if pathname
-             (write-jbb document pathname)
-             (save-dialog window document)))))
+         (if (state-pathname state)
+             (write-jbb document (state-pathname state))
+             (setf (state-pathname state)
+                   (save-dialog window document))))))
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
@@ -286,9 +296,9 @@ document's window is created or destroyed."
            (when (gtk-toggle-button-active widget)
              (cond
                ((eq widget pencil)
-                (setq active-tool :pencil))
+                (setf (state-active-tool state) :pencil))
                ((eq widget color-picker)
-                (setq active-tool :color-picker)))))))
+                (setf (state-active-tool state) :color-picker)))))))
 
       (gtk-box-pack-start tools-box pencil       :expand nil)
       (gtk-box-pack-start tools-box color-picker :expand nil)
@@ -403,14 +413,16 @@ document's window is created or destroyed."
        item-file-save "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (if pathname
-             (write-jbb document pathname)
-             (save-dialog window document))))
+         (if (state-pathname state)
+             (write-jbb document (state-pathname state))
+             (setf (state-pathname state)
+                   (save-dialog window document)))))
       (g-signal-connect
        item-file-save-as "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (save-dialog window document pathname)))
+         (setf (state-pathname state)
+               (save-dialog window document (state-pathname state)))))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)
