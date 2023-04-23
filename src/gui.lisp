@@ -362,6 +362,8 @@ document's window is created or destroyed."
            background-button))
        nil (si:range 0 (palette-length document)))
 
+      (setf (palette-button-color current-color)
+            (current-color document))
       (gtk-box-pack-end toolbar-box current-color :expand nil)
       (gtk-container-add frame grid)
       (gtk-box-pack-end workspace-box frame))
