@@ -38,10 +38,8 @@ document and its pathname."
             (princ c)
             nil))))))
 
-(defun save-dialog (parent document &optional filename)
-  "Run 'Save Document' dialog and maybe save the document. If the
-document's pathname is known, it can be passed as an optional
-argument."
+(defun save-dialog (parent document)
+  "Run 'Save Document' dialog and maybe save the document."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Save Document"
                  parent
@@ -50,9 +48,10 @@ argument."
                  "gtk-save" :accept))
         (filter (make-instance 'gtk-file-filter)))
     (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
-    (if filename
-        (gtk-file-chooser-set-filename dialog filename)
-        (gtk-file-chooser-set-current-name dialog "Untitled.jbb"))
+    (let ((pathname (window-document-pathname parent)))
+      (if pathname
+          (gtk-file-chooser-set-filename dialog pathname)
+          (gtk-file-chooser-set-current-name dialog "Untitled.jbb")))
     (gtk-file-filter-add-pattern filter "*.jbb")
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
@@ -128,61 +127,62 @@ SCHEME-AREAs) if needed."
        (document-width  document)
        (document-height document))
     (when changedp
+      (setf (window-dirty-state-p parent) t)
       (update-scheme document width height)
       (mapc #'gtk-widget-queue-draw areas)))
   (values))
 
-(defclass document-state ()
-  ((pathname    :initarg  :pathname
-                :initform nil
-                :type     (or null pathname string)
-                :accessor state-pathname)
-   (active-tool :initform :pencil
-                :type     (member :pencil :color-picker)
-                :accessor state-active-tool)
-   (dirtyp      :initform nil
-                :type     boolean
-                :accessor state-dirty-p
-                :documentation "If the document is edited but not saved")
-   (callback    :initarg  :callback
-                :reader   state-callback
-                :documentation "Callback called on window destruction and creation")))
+(defclass document-window (gtk-window)
+  ((pathname      :initarg  :pathname
+                  :initform nil
+                  :type     (or null pathname string)
+                  :accessor window-document-pathname)
+   (active-tool   :initform :pencil
+                  :type     (member :pencil :color-picker)
+                  :accessor window-active-tool)
+   (dirty-state-p :initform nil
+                  :type     boolean
+                  :accessor window-dirty-state-p
+                  :documentation "If the document is edited but not saved")
+   (callback      :initarg  :callback
+                  :reader   window-callback
+                  :documentation "Callback called on window destruction and creation"))
+  (:metaclass gobject-class)
+  (:documentation "GTK window for editing crochet rope models"))
 
-(defun set-window-title (window pathname)
+(defun set-window-title (window)
   (setf (gtk-window-title window)
-        (format nil "cl-beads~@[: ~a~]" pathname)))
+        (format nil "cl-beads~@[: ~a~]"
+                (window-document-pathname window))))
 
-(defun new-handler (state widget)
+(defun new-handler (parent widget)
   (declare (ignore widget))
   (open-document (make-instance 'document)
-                 (state-callback state)))
+                 (window-callback parent)))
 
-(defun open-handler (parent state widget)
+(defun open-handler (parent widget)
   (declare (ignore widget))
   (multiple-value-bind (document pathname)
       (open-dialog parent)
     (when document
       (set-window-title
-       (open-document document (state-callback state) :pathname pathname)
-       pathname))))
+       (open-document document (window-callback parent) :pathname pathname)))))
 
-(defun save-as-handler (parent state document widget)
+(defun save-as-handler (parent document widget)
   (declare (ignore widget))
-  (let ((pathname (save-dialog
-                   parent document
-                   (state-pathname state))))
+  (let ((pathname (save-dialog parent document)))
     (when pathname
-      (setf (state-pathname state) pathname
-            (state-dirty-p   state) nil)
-      (set-window-title parent pathname))))
+      (setf (window-document-pathname parent) pathname
+            (window-dirty-state-p     parent) nil)
+      (set-window-title parent))))
 
-(defun save-handler (parent state document widget)
+(defun save-handler (parent document widget)
   (cond
-    ((state-pathname state)
-     (write-jbb document (state-pathname state))
-     (setf (state-dirty-p state) nil))
+    ((window-document-pathname parent)
+     (write-jbb document (window-document-pathname parent))
+     (setf (window-dirty-state-p parent) nil))
     (t
-     (save-as-handler parent state document widget))))
+     (save-as-handler parent document widget))))
 
 (defun quit-dialog (parent)
   "Ask if we should close the window. Return T if we should."
@@ -208,10 +208,12 @@ SCHEME-AREAs) if needed."
 the document (if exists, i.e. the document is not a new
 document). WINDOW-CALLBACK is a callback which is called when the
 document's window is created or destroyed."
-  (let ((window (make-instance 'gtk-window
+  (let ((window (make-instance 'document-window
                                :title          "cl-beads"
                                :default-width  600
-                               :default-height 800))
+                               :default-height 800
+                               :pathname pathname
+                               :callback window-callback))
 
         (menu-bar      (make-instance 'gtk-menu-bar))
         (workspace-box (make-instance 'gtk-hbox))
@@ -237,10 +239,7 @@ document's window is created or destroyed."
                               :vexpand       t
                               :sensitive     nil
                               :model         (make-instance 'simulated-model :document document))))
-        (current-color (make-instance 'palette-button :sensitive nil))
-        (state (make-instance 'document-state
-                              :pathname pathname
-                              :callback window-callback)))
+        (current-color (make-instance 'palette-button :sensitive nil)))
 
     ;; Handle click on a bead
     (dolist (area scheme-areas)
@@ -251,13 +250,13 @@ document's window is created or destroyed."
          (when (< bead-idx (array-total-size (document-scheme document)))
            ;; How can it be otherwise?
            (symbol-macrolet ((bead-color (row-major-aref (document-scheme document) bead-idx)))
-             (ecase (state-active-tool state)
+             (ecase (window-active-tool window)
                (:pencil
                 (let ((current-color (document-palette-idx document)))
                   (setf bead-color (if (= bead-color current-color) 0 current-color)))
                 ;; TODO: Redraw only a small area
                 (mapc #'gtk-widget-queue-draw scheme-areas)
-                (setf (state-dirty-p state) t))
+                (setf (window-dirty-state-p window) t))
                (:color-picker
                 (setf (document-palette-idx document) bead-color
                       (palette-button-color current-color)
@@ -268,7 +267,7 @@ document's window is created or destroyed."
      window "delete-event"
      (lambda (widget event)
        (declare (ignore widget event))
-       (when (state-dirty-p state)
+       (when (window-dirty-state-p window)
          (not (quit-dialog window)))))
 
     ;; Call WINDOW-CALLBACK when the window is closed
@@ -322,13 +321,13 @@ document's window is created or destroyed."
 
       (g-signal-connect
        new-button "clicked"
-       (alex:curry #'new-handler state))
+       (alex:curry #'new-handler window))
       (g-signal-connect
        open-button "clicked"
-       (alex:curry #'open-handler window state))
+       (alex:curry #'open-handler window))
       (g-signal-connect
        save-button "clicked"
-       (alex:curry #'save-handler window state document)))
+       (alex:curry #'save-handler window document)))
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
@@ -360,9 +359,9 @@ document's window is created or destroyed."
            (when (gtk-toggle-button-active widget)
              (cond
                ((eq widget pencil)
-                (setf (state-active-tool state) :pencil))
+                (setf (window-active-tool window) :pencil))
                ((eq widget color-picker)
-                (setf (state-active-tool state) :color-picker)))))))
+                (setf (window-active-tool window) :color-picker)))))))
 
       (let* ((simulated-area (third scheme-areas))
              (simulated-model (scheme-area-model simulated-area)))
@@ -439,7 +438,7 @@ document's window is created or destroyed."
               ;; Redraw areas
               (mapc #'gtk-widget-queue-draw scheme-areas)
               ;; Set dirty state
-              (setf (state-dirty-p state) t)))
+              (setf (window-dirty-state-p window) t)))
 
            (g-signal-connect
             color-button "my-color-set"
@@ -453,7 +452,7 @@ document's window is created or destroyed."
               ;; Redraw areas
               (mapc #'gtk-widget-queue-draw scheme-areas)
               ;; Set dirty state
-              (setf (state-dirty-p state) t)))
+              (setf (window-dirty-state-p window) t)))
            background-button))
        nil (si:range 0 (palette-length document)))
 
@@ -483,16 +482,16 @@ document's window is created or destroyed."
       ;; Handlers
       (g-signal-connect
        item-file-new "activate"
-       (alex:curry #'new-handler state))
+       (alex:curry #'new-handler window))
       (g-signal-connect
        item-file-open "activate"
-       (alex:curry #'open-handler window state))
+       (alex:curry #'open-handler window))
       (g-signal-connect
        item-file-save "activate"
-       (alex:curry #'save-handler window state document))
+       (alex:curry #'save-handler window document))
       (g-signal-connect
        item-file-save-as "activate"
-       (alex:curry #'save-as-handler window state document))
+       (alex:curry #'save-as-handler window document))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)
