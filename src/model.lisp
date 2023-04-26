@@ -113,6 +113,45 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
          (float (/ (1+ (document-width document))) 0d0))))
 
 ;; TODO: Simulated
-(defclass simulated-model (dummy-model)
-  ()
+(defclass simulated-model (scheme-model)
+  ((rotation :initform 0
+             :initarg  :rotation
+             :type     integer
+             :accessor simulated-model-rotation))
   (:documentation "This is what the result looks like."))
+
+(defmethod beads-iterator ((model simulated-model))
+  (let* ((document (scheme-model-document model))
+         (width  (document-width  document))
+         (height (document-height document))
+         (scheme (document-scheme document))
+         (bead-size (bead-size model))
+         (bead-size/2 (/ bead-size 2))
+         ;; Check for even width
+         (row-length (ceiling width 2))
+         (offset (/ (- 1 (* bead-size (- row-length 0.5))) 2)))
+    (si:imap
+     (lambda (coord)
+       (destructuring-bind (i . j) coord
+         (cons
+          (if (evenp i)
+              (rect (+ offset
+                       (if (zerop j)
+                           0 (- (* j bead-size) bead-size/2)))
+                    (* i bead-size)
+                    (if (zerop j) bead-size/2 bead-size)
+                    bead-size)
+              (rect (+ offset (* j bead-size))
+                    (+        (* i bead-size))
+                    (if (= (1+ j) row-length)
+                        bead-size/2 bead-size)
+                    bead-size))
+          (palette-color
+           document
+           (aref scheme i
+                 (mod (+ (simulated-model-rotation model)
+                         (floor (1+ i) 2)
+                         j)
+                      width))))))
+     (si:product (si:range 0 height)
+                 (si:range 0 row-length)))))

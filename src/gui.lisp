@@ -336,12 +336,12 @@ document's window is created or destroyed."
       (gtk-box-pack-start edit-box redo-button :expand nil)
       (gtk-box-pack-start toolbar-box edit-box :expand nil :padding 5))
 
-    ;; Tools (Pencil / Color pick) buttons
+    ;; Tools (Pencil / Color pick / Rotation) buttons
     (let* ((tools-box (make-instance 'gtk-hbox))
            (pencil (gtk-radio-button-new nil))
-           (color-picker (gtk-radio-button-new-from-widget pencil)))
-      (gtk-toggle-button-set-mode pencil       nil)
-      (gtk-toggle-button-set-mode color-picker nil)
+           (color-picker (gtk-radio-button-new-from-widget pencil))
+           (rotate-left  (make-stock-button "go-previous"))
+           (rotate-right (make-stock-button "go-next")))
       (setf (gtk-button-image pencil)
             ;; Converted from this file:
             ;; https://commons.wikimedia.org/wiki/File:Antu_document-edit-sign.svg
@@ -351,6 +351,7 @@ document's window is created or destroyed."
             (gtk-image-new-from-icon-name "gtk-color-picker" :large-toolbar))
 
       (dolist (button (list pencil color-picker))
+        (gtk-toggle-button-set-mode button nil)
         (g-signal-connect
          button "toggled"
          (lambda (widget)
@@ -361,8 +362,25 @@ document's window is created or destroyed."
                ((eq widget color-picker)
                 (setf (state-active-tool state) :color-picker)))))))
 
+      (let* ((simulated-area (third scheme-areas))
+             (simulated-model (scheme-area-model simulated-area)))
+        (g-signal-connect
+         rotate-left "clicked"
+         (lambda (widget)
+           (declare (ignore widget))
+           (decf (simulated-model-rotation simulated-model))
+           (gtk-widget-queue-draw simulated-area)))
+        (g-signal-connect
+         rotate-right "clicked"
+         (lambda (widget)
+           (declare (ignore widget))
+           (incf (simulated-model-rotation simulated-model))
+           (gtk-widget-queue-draw simulated-area))))
+
       (gtk-box-pack-start tools-box pencil       :expand nil)
       (gtk-box-pack-start tools-box color-picker :expand nil)
+      (gtk-box-pack-start tools-box rotate-left  :expand nil)
+      (gtk-box-pack-start tools-box rotate-right :expand nil)
       (gtk-box-pack-start toolbar-box tools-box  :expand nil))
 
     ;; Settings button

@@ -32,10 +32,10 @@ Then run a produced binary.
 
 ## TODO list
 
-* Simulation view
+* ~~Simulation view~~
 * Some report maybe?
 * ~~Quit confirmation~~
 * Changing color for a range of beads
 * Edit history
 * Change color for outline of a bead
-* Add support for the other popular format (I forgot how that program is called).
+* Add support for DB-Bead format.
