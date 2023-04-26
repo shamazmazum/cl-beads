@@ -123,11 +123,19 @@
 (sera:-> update-scheme (document unsigned-byte unsigned-byte)
          (values &optional))
 (defun update-scheme (document width height)
-  ;; TODO: Maybe keep the old data somehow?
-  (setf (document-scheme document)
-        (make-array (list height width)
-                    :element-type 'unsigned-byte
-                    :initial-element 0))
+  (let* ((scheme (document-scheme document))
+         (selection-height (min height (array-dimension scheme 0)))
+         (selection-width  (min width  (array-dimension scheme 1)))
+         (new-scheme (make-array (list height width)
+                                 :element-type 'unsigned-byte
+                                 :initial-element 0)))
+    (setf (document-scheme document) new-scheme
+          (select:select new-scheme
+            (select:range 0 selection-height)
+            (select:range 0 selection-width))
+          (select:select scheme
+            (select:range 0 selection-height)
+            (select:range 0 selection-width))))
   (values))
 
 (sera:-> document-height (document)

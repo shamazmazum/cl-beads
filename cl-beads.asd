@@ -19,7 +19,8 @@
                :alexandria
                :stateless-iterators
                :cl-cffi-gtk
-               :cl-css))
+               :cl-css
+               :select))
 
 (defsystem :cl-beads/application
   :name :cl-beads/application
