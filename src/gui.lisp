@@ -230,10 +230,12 @@ document's window is created or destroyed."
                               :valign        :fill
                               :vexpand       t
                               :model         (make-instance 'corrected-model :document document))
+               ;; FIXME: There are problems with editing using this view
                (make-instance 'scheme-area
                               :width-request 200
                               :valign        :fill
                               :vexpand       t
+                              :sensitive     nil
                               :model         (make-instance 'simulated-model :document document))))
         (current-color (make-instance 'palette-button :sensitive nil))
         (state (make-instance 'document-state
