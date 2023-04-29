@@ -4,11 +4,11 @@
   (make-instance 'gtk-button
                  :image (gtk-image-new-from-icon-name stock-id :large-toolbar)))
 
-(defun make-menu-entry (stock-id)
+(defun make-menu-entry (label &key (stockp t))
   (make-instance 'gtk-image-menu-item
-                 :label stock-id
+                 :label         label
                  :use-underline t
-                 :use-stock     t))
+                 :use-stock     stockp))
 
 (defun open-dialog (parent)
   "Run 'Open Document' dialog and maybe load a document. Return the
@@ -160,13 +160,19 @@ SCHEME-AREAs) if needed."
   (open-document (make-instance 'document)
                  (window-callback parent)))
 
-(defun open-handler (parent widget)
+(defun open-in-new-window-handler (parent widget)
   (declare (ignore widget))
   (multiple-value-bind (document pathname)
       (open-dialog parent)
     (when document
       (set-window-title
        (open-document document (window-callback parent) :pathname pathname)))))
+
+(defun open-handler (parent widget)
+  (when (and (open-in-new-window-handler parent widget)
+             (not (window-dirty-state-p parent)))
+    ;; Close the existing window if an associated document is saved
+    (gtk-widget-destroy parent)))
 
 (defun save-as-handler (parent document widget)
   (declare (ignore widget))
@@ -468,13 +474,15 @@ document's window is created or destroyed."
                                     :label "_File"
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
-          (item-file-new     (make-menu-entry "gtk-new"))
-          (item-file-open    (make-menu-entry "gtk-open"))
-          (item-file-save    (make-menu-entry "gtk-save"))
-          (item-file-save-as (make-menu-entry "gtk-save-as"))
-          (item-file-quit    (make-menu-entry "gtk-quit")))
+          (item-file-new      (make-menu-entry "gtk-new"))
+          (item-file-open     (make-menu-entry "gtk-open"))
+          (item-file-open-new (make-menu-entry "Open in new _window" :stockp nil))
+          (item-file-save     (make-menu-entry "gtk-save"))
+          (item-file-save-as  (make-menu-entry "gtk-save-as"))
+          (item-file-quit     (make-menu-entry "gtk-quit")))
       (gtk-menu-shell-append submenu item-file-new)
       (gtk-menu-shell-append submenu item-file-open)
+      (gtk-menu-shell-append submenu item-file-open-new)
       (gtk-menu-shell-append submenu item-file-save)
       (gtk-menu-shell-append submenu item-file-save-as)
       (gtk-menu-shell-append submenu item-file-quit)
@@ -486,6 +494,9 @@ document's window is created or destroyed."
       (g-signal-connect
        item-file-open "activate"
        (alex:curry #'open-handler window))
+      (g-signal-connect
+       item-file-open-new "activate"
+       (alex:curry #'open-in-new-window-handler window))
       (g-signal-connect
        item-file-save "activate"
        (alex:curry #'save-handler window document))
