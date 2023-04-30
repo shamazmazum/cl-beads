@@ -122,38 +122,50 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
 (defmethod beads-iterator ((model simulated-model))
   (let* ((document (scheme-model-document model))
          (width  (document-width  document))
-         (height (document-height document))
          (scheme (document-scheme document))
          (bead-size (bead-size model))
          (bead-size/2 (/ bead-size 2))
          (row-length (ceiling width 2))
          (offset (/ (- 1 (* bead-size (- row-length 0.5))) 2)))
-    (si:imap
-     (lambda (coord)
-       (destructuring-bind (i . j) coord
-         (cons
-          ;; Rows have a different "shift"
-          (if (evenp i)
-              ;; Even row
-              (rect (+ offset
-                       (if (zerop j)
-                           0 (- (* j bead-size) bead-size/2)))
-                    (* i bead-size)
-                    (if (zerop j) bead-size/2 bead-size)
-                    bead-size)
-              ;; Odd row
-              (rect (+ offset (* j bead-size))
-                    (+        (* i bead-size))
-                    (if (= (1+ j) row-length)
-                        bead-size/2 bead-size)
-                    bead-size))
-          (palette-color
-           document
-           (aref scheme i
-                 (mod (+ (simulated-model-rotation model)
-                         ;; Correction for rows having different width
-                         (floor (1+ i) 2)
-                         j)
-                      width))))))
-     (si:product (si:range 0 height)
-                 (si:range 0 row-length)))))
+    (flet ((bead-rect (y x)
+             ;; Rows have a different "shift"
+             (if (evenp y)
+                 ;; Even row
+                 (rect (+ offset (if (zerop x) 0 (* bead-size (- x 0.5))))
+                       (* y bead-size)
+                       (if (zerop x) bead-size/2 bead-size)
+                       bead-size)
+                 ;; Odd row
+                 (rect (+ offset (* x bead-size))
+                       (+        (* y bead-size))
+                       (if (= (1+ x) row-length)
+                           bead-size/2 bead-size)
+                       bead-size))))
+      (si:filter
+       #'identity
+       (si:imap
+        (lambda (idx)
+          (let ((rect
+                 (multiple-value-bind (q r)
+                     (floor (+ (mod (simulated-model-rotation model) width) idx)
+                            (1+ (* 2 width)))
+                   (cond
+                     ;; Even row, first bead's width is half the normal width
+                     ((< r (1- row-length))
+                      (bead-rect (* 2 q) (1+ r)))
+                     ;; Odd row, last bead's width is half the normal width
+                     ((< (1- width) r (+ width row-length))
+                      (bead-rect (1+ (* 2 q)) (- r width)))
+                     ;; First bead in the next even row
+                     ((= r (* 2 width))
+                       (bead-rect (* 2 (1+ q)) 0))
+                     (t
+                      ;; Invisible bead
+                      nil)))))
+            (when rect
+              (cons rect
+                    (palette-color
+                     document
+                     (row-major-aref
+                      scheme idx))))))
+        (si:range 0 (array-total-size scheme)))))))
