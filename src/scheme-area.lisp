@@ -3,6 +3,9 @@
 (defparameter *outline-width* 1d-2
   "Default outline width for a bead.")
 
+(defparameter *outline-color* (color 0d0 0d0 0d0)
+  "Default color for bead outline.")
+
 (defparameter *ruler-spacing* 10
   "Default ruler spacing value (in number of beads)")
 
@@ -15,6 +18,10 @@
                   :initarg  :outline-width
                   :type     double-float
                   :accessor scheme-area-outline-width)
+   (outline-color :initform *outline-color*
+                  :initarg  :outline-color
+                  :type     color
+                  :accessor scheme-area-outline-color)
    (ruler-spacing :initform *ruler-spacing*
                   :initarg  :ruler-spacing
                   :type     unsigned-byte
@@ -34,7 +41,7 @@
   (:documentation "Widget which shows a scheme (via a model) and
 allows drawing on it."))
 
-(defun draw-bead (ctx rect color)
+(defun draw-bead (ctx rect color outline-color)
   "Draw a bead with position RECT and color COLOR on a cairo context
 CTX."
   (flet ((draw-rect ()
@@ -51,7 +58,11 @@ CTX."
      (color-b color))
     (draw-rect)
     (cairo-fill ctx)
-    (cairo-set-source-rgb ctx 0 0 0)
+    (cairo-set-source-rgb
+     ctx
+     (color-r outline-color)
+     (color-g outline-color)
+     (color-b outline-color))
     (draw-rect)
     (cairo-stroke ctx)))
 
@@ -126,11 +137,16 @@ CTX."
     ;; Draw beads
     (si:do-iterator (bead (filter-visible-beads ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
-        (draw-bead ctx rect color)))
+        (draw-bead ctx rect color (scheme-area-outline-color widget))))
 
     ;; Emphasize rows
     (when (scheme-area-draw-ruler-p widget)
-      (cairo-set-source-rgb ctx 0 0 0)
+      (let ((color (scheme-area-outline-color widget)))
+        (cairo-set-source-rgb
+         ctx
+         (color-r color)
+         (color-g color)
+         (color-b color)))
       (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
       (loop for y from 0d0 below (estimate-height model)
             by (* (scheme-area-ruler-spacing widget) (bead-size model))

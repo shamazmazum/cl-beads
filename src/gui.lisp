@@ -63,13 +63,9 @@ document and its pathname."
             filename))
       (gtk-widget-destroy dialog))))
 
-(sera:-> settings-dialog
-         (gtk-window unsigned-byte unsigned-byte)
-         (values unsigned-byte unsigned-byte boolean &optional))
-(defun settings-dialog (parent width height)
-  "Run settings dialog and return the new width and height of the
-scheme. The third returned value is a boolean indicating if settings
-were changed."
+(defun settings-dialog (parent document areas)
+"Run settings dialog and update the document (and redraw SCHEME-AREAs)
+if needed."
   (flet ((make-spin-button (adjustment)
            (make-instance 'gtk-spin-button
                           :orientation :horizontal
@@ -82,7 +78,7 @@ were changed."
                                  :has-separator t))
           (width-button (make-spin-button
                          (make-instance 'gtk-adjustment
-                                        :value          width
+                                        :value          (document-width document)
                                         :lower          6
                                         :upper          20
                                         :step-increment 1
@@ -90,12 +86,16 @@ were changed."
                                         :page-size      0)))
           (height-button (make-spin-button
                           (make-instance 'gtk-adjustment
-                                         :value          height
+                                         :value          (document-height document)
                                          :lower          100
                                          :upper          5000
                                          :step-increment 10
                                          :page-increment 50
                                          :page-size      0)))
+          (outline-color (make-instance 'gtk-color-button
+                                        :rgba (color->gdk-rgba
+                                               (scheme-area-outline-color
+                                                (first areas)))))
           (box (make-instance 'gtk-vbox)))
 
       (let ((%box (make-instance 'gtk-hbox)))
@@ -106,6 +106,10 @@ were changed."
         (gtk-box-pack-start %box (make-instance 'gtk-label :label "Height"))
         (gtk-box-pack-end   %box height-button)
         (gtk-box-pack-start box %box))
+      (let ((%box (make-instance 'gtk-hbox)))
+        (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
+        (gtk-box-pack-end   %box outline-color)
+        (gtk-box-pack-start box %box))
       (gtk-dialog-add-button dialog "gtk-ok" :ok)
       (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
       (gtk-box-pack-start (gtk-dialog-get-content-area dialog) box)
@@ -113,24 +117,14 @@ were changed."
       (let ((response (gtk-dialog-run dialog))
             (width  (floor (gtk-spin-button-value width-button)))
             (height (floor (gtk-spin-button-value height-button))))
-        (gtk-widget-destroy dialog)
-      (values width height (eq response :ok))))))
-
-(sera:-> exec-settings-and-update (gtk-window document list)
-         (values &optional))
-(defun exec-settings-and-update (parent document areas)
-  "Run settings dialog and update the document (and redraw
-SCHEME-AREAs) if needed."
-  (multiple-value-bind (width height changedp)
-      (settings-dialog
-       parent
-       (document-width  document)
-       (document-height document))
-    (when changedp
-      (setf (window-dirty-state-p parent) t)
-      (update-scheme document width height)
-      (mapc #'gtk-widget-queue-draw areas)))
-  (values))
+        (when (eq response :ok)
+          (setf (window-dirty-state-p parent) t)
+          (update-scheme document width height)
+          (dolist (area areas)
+            (setf (scheme-area-outline-color area)
+                  (gdk-rgba->color (gtk-color-button-rgba outline-color)))
+            (gtk-widget-queue-draw area)))
+        (gtk-widget-destroy dialog)))))
 
 (defclass document-window (gtk-window)
   ((pathname      :initarg  :pathname
@@ -398,7 +392,7 @@ document's window is created or destroyed."
        pref-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (exec-settings-and-update window document scheme-areas)))
+         (settings-dialog window document scheme-areas)))
 
       (gtk-box-pack-start settings-box pref-button :expand nil)
       (gtk-box-pack-start toolbar-box settings-box :expand nil :padding 5))
@@ -535,7 +529,7 @@ document's window is created or destroyed."
        item-settings-pref "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (exec-settings-and-update window document scheme-areas)))
+         (settings-dialog window document scheme-areas)))
 
       (gtk-menu-shell-append submenu item-settings-pref)
       (setf (gtk-menu-item-submenu item-settings) submenu)
