@@ -150,25 +150,25 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
        #'identity
        (si:imap
         (lambda (idx)
-          (let ((rect
-                 (multiple-value-bind (q r)
-                     (floor (+ (mod (simulated-model-rotation model) width) idx)
-                            (1+ (* 2 width)))
-                   (cond
-                     ;; Even row, first bead's width is half the normal width
-                     ((< r (1- row-length))
-                      (bead-rect (* 2 q) (1+ r)))
-                     ;; Odd row, last bead's width is half the normal width
-                     ((< (1- width) r (+ width row-length))
-                      (bead-rect (1+ (* 2 q)) (- r width)))
-                     ;; First bead in the next even row
-                     ((= r (* 2 width))
-                       (bead-rect (* 2 (1+ q)) 0))
-                     (t
-                      ;; Invisible bead
-                      nil)))))
-            (when rect
-              (bead-spec rect
-                         (palette-color document (row-major-aref scheme idx))
-                         idx))))
+          (alex:when-let
+              ((rect
+                (multiple-value-bind (q r)
+                    (floor (+ (mod (simulated-model-rotation model) width) idx)
+                           (1+ (* 2 width)))
+                  (cond
+                    ;; Even row, first bead's width is half the normal width
+                    ((< r (1- row-length))
+                     (bead-rect (* 2 q) (1+ r)))
+                    ;; Odd row, last bead's width is half the normal width
+                    ((< (1- width) r (+ width row-length))
+                     (bead-rect (1+ (* 2 q)) (- r width)))
+                    ;; First bead in the next even row
+                    ((= r (* 2 width))
+                     (bead-rect (* 2 (1+ q)) 0))
+                    (t
+                     ;; Invisible bead
+                     nil)))))
+            (bead-spec rect
+                       (palette-color document (row-major-aref scheme idx))
+                       idx)))
         (si:range 0 (array-total-size scheme)))))))

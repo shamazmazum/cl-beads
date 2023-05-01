@@ -171,20 +171,20 @@ as \"my-bead-clicked\"."
               (gdk-rectangle-x allocation))
            (+ (gdk-rectangle-y allocation)
               (gdk-event-button-y event)))
-        (let ((bead-spec
-               (si:consume-one
-                (si:drop-while
-                 (lambda (bead-spec)
-                   (let ((rect (bead-spec-rect bead-spec)))
-                     (not
-                      (and
-                       (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
-                       (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
-                 (beads-iterator model)))))
-          (when bead-spec
-            (g-signal-emit widget
-                           "my-bead-clicked"
-                           (bead-spec-linear-index bead-spec))))))))
+        (alex:when-let
+            ((bead-spec
+              (si:consume-one
+               (si:drop-while
+                (lambda (bead-spec)
+                  (let ((rect (bead-spec-rect bead-spec)))
+                    (not
+                     (and
+                      (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
+                      (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
+                (beads-iterator model)))))
+          (g-signal-emit widget
+                         "my-bead-clicked"
+                         (bead-spec-linear-index bead-spec)))))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))
