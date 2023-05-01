@@ -37,5 +37,5 @@ Then run a produced binary.
 * ~~Quit confirmation~~
 * Changing color for a range of beads
 * Edit history
-* Change color for outline of a bead
+* ~~Change color for outline of a bead~~
 * Add support for DB-Bead format.

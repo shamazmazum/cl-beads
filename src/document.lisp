@@ -71,35 +71,42 @@
 (defparameter *default-height* 200
   "Initial height of the scheme.")
 
+(defparameter *default-outline-color* (color 0d0 0d0 0d0)
+  "Default color for bead outline.")
+
 (defclass document ()
-  ((palette      :initform (copy-seq *initial-palette*)
-                 :initarg  :palette
-                 :type     palette
-                 :reader   document-palette)
-   (palette-idx  :initform 0
-                 :initarg  :palette-idx
-                 :type     unsigned-byte
-                 :accessor document-palette-idx)
-   (scheme       :initform (make-array (list *default-height*
-                                             *default-width*)
-                                       :element-type 'unsigned-byte
-                                       ;; Initialize with background color
-                                       :initial-element 0)
-                 :initarg  :scheme
-                 :type     scheme
-                 :accessor document-scheme)
-   (author       :initform ""
-                 :initarg  :author
-                 :type     string
-                 :accessor document-author)
-   (organization :initform ""
-                 :initarg  :organization
-                 :type     string
-                 :accessor document-organization)
-   (notes        :initform ""
-                 :initarg  :organization
-                 :type     string
-                 :accessor document-notes)))
+  ((palette       :initform (copy-seq *initial-palette*)
+                  :initarg  :palette
+                  :type     palette
+                  :reader   document-palette)
+   (palette-idx   :initform 0
+                  :initarg  :palette-idx
+                  :type     unsigned-byte
+                  :accessor document-palette-idx)
+   (scheme        :initform (make-array (list *default-height*
+                                              *default-width*)
+                                        :element-type 'unsigned-byte
+                                        ;; Initialize with background color
+                                        :initial-element 0)
+                  :initarg  :scheme
+                  :type     scheme
+                  :accessor document-scheme)
+   (outline-color :initform *default-outline-color*
+                  :initarg  :outline-color
+                  :type     color
+                  :accessor document-outline-color)
+   (author        :initform ""
+                  :initarg  :author
+                  :type     string
+                  :accessor document-author)
+   (organization  :initform ""
+                  :initarg  :organization
+                  :type     string
+                  :accessor document-organization)
+   (notes         :initform ""
+                  :initarg  :organization
+                  :type     string
+                  :accessor document-notes)))
 
 (defgeneric palette-color (document index)
   (:documentation "Accessor for a particular color from the document's palette."))

@@ -3,9 +3,6 @@
 (defparameter *outline-width* 1d-2
   "Default outline width for a bead.")
 
-(defparameter *outline-color* (color 0d0 0d0 0d0)
-  "Default color for bead outline.")
-
 (defparameter *ruler-spacing* 10
   "Default ruler spacing value (in number of beads)")
 
@@ -18,10 +15,6 @@
                   :initarg  :outline-width
                   :type     double-float
                   :accessor scheme-area-outline-width)
-   (outline-color :initform *outline-color*
-                  :initarg  :outline-color
-                  :type     color
-                  :accessor scheme-area-outline-color)
    (ruler-spacing :initform *ruler-spacing*
                   :initarg  :ruler-spacing
                   :type     unsigned-byte
@@ -142,19 +135,20 @@ CTX."
     ;; Draw beads
     (si:do-iterator (bead (filter-visible-beads ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
-        (draw-bead ctx rect color (scheme-area-outline-color widget))))))
+        (draw-bead ctx rect color
+                   (document-outline-color (scheme-model-document model)))))))
 
 (defmethod draw-scheme progn ((widget ruler-mixin) ctx)
   "Draw a scheme on a scheme-area widget."
   (let ((ctx (pointer ctx))
         (allocation (gtk-widget-get-allocation widget))
-        (model (scheme-area-model widget))
-        (color (scheme-area-outline-color widget)))
-    (cairo-set-source-rgb
-     ctx
-     (color-r color)
-     (color-g color)
-     (color-b color))
+        (model (scheme-area-model widget)))
+    (let ((color (document-outline-color (scheme-model-document model))))
+      (cairo-set-source-rgb
+       ctx
+       (color-r color)
+       (color-g color)
+       (color-b color)))
         ;; Emphasize rows
     (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
     (loop for y from 0d0 below (estimate-height model)

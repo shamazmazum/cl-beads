@@ -94,8 +94,7 @@ if needed."
                                          :page-size      0)))
           (outline-color (make-instance 'gtk-color-button
                                         :rgba (color->gdk-rgba
-                                               (scheme-area-outline-color
-                                                (first areas)))))
+                                               (document-outline-color document))))
           (box (make-instance 'gtk-vbox)))
 
       (let ((%box (make-instance 'gtk-hbox)))
@@ -118,12 +117,11 @@ if needed."
             (width  (floor (gtk-spin-button-value width-button)))
             (height (floor (gtk-spin-button-value height-button))))
         (when (eq response :ok)
-          (setf (window-dirty-state-p parent) t)
+          (setf (window-dirty-state-p parent) t
+                (document-outline-color document)
+                (gdk-rgba->color (gtk-color-button-rgba outline-color)))
           (update-scheme document width height)
-          (dolist (area areas)
-            (setf (scheme-area-outline-color area)
-                  (gdk-rgba->color (gtk-color-button-rgba outline-color)))
-            (gtk-widget-queue-draw area)))
+          (mapc #'gtk-widget-queue-draw areas))
         (gtk-widget-destroy dialog)))))
 
 (defclass document-window (gtk-window)

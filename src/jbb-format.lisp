@@ -10,6 +10,15 @@
      (format s "Invalid input file ~a"
              (invalid-file-pathname c)))))
 
+(sera:-> parse-color (list)
+         (values color &optional))
+(defun parse-color (color)
+  (destructuring-bind (r g b a) (cdr color)
+    (declare (ignore a))
+    (color (/ r 255d0)
+           (/ g 255d0)
+           (/ b 255d0))))
+
 (sera:-> read-jbb ((or pathname string))
          (values document &optional))
 (defun read-jbb (pathname)
@@ -27,13 +36,7 @@
           (error 'invalid-file :pathname pathname)))
       (make-instance 'document
                      :palette
-                     (let ((colors (mapcar
-                                    (lambda (color)
-                                      (destructuring-bind (r g b a) (cdr color)
-                                        (declare (ignore a))
-                                        (color (/ r 255d0)
-                                               (/ g 255d0)
-                                               (/ b 255d0))))
+                     (let ((colors (mapcar #'parse-color
                                     (alex:assoc-value content 'cl-beads-jbb::colors))))
                        (make-array (length colors)
                                    :element-type 'color
@@ -42,6 +45,10 @@
                      (let* ((view  (alex:assoc-value content 'cl-beads-jbb::view))
                             (color (alex:assoc-value view    'cl-beads-jbb::selected-color)))
                        (car color))
+                     :outline-color
+                     (let* ((view  (alex:assoc-value content 'cl-beads-jbb::view))
+                            (color (alex:assoc-value view    'cl-beads-jbb::outline-color)))
+                       (if color (parse-color (car color)) *default-outline-color*))
                      :scheme
                      (let ((model (mapcar #'cdr (alex:assoc-value content 'cl-beads-jbb::model))))
                        (make-array (list (length model)
@@ -79,7 +86,16 @@
                  (cl-beads-jbb::shift 0)
                  (cl-beads-jbb::draw-colors true)
                  (cl-beads-jbb::draw-symbols false)
-                 (cl-beads-jbb::symbols "·abcdefghijklmnopqrstuvwxyz+-/\\*"))
+                 (cl-beads-jbb::symbols "·abcdefghijklmnopqrstuvwxyz+-/\\*")
+                 ;; This one is not original to JBead program, but
+                 ;; JBead just ignores unknown fields
+                 ,(let ((color (document-outline-color document)))
+                    `(cl-beads-jbb::outline-color
+                      (cl-beads-jbb::rgb
+                       ,(floor (* 255 (color-r color)))
+                       ,(floor (* 255 (color-g color)))
+                       ,(floor (* 255 (color-b color)))
+                       255))))
                 (cl-beads-jbb::model
                  ,@(loop for i below (document-height document) collect
                          (cons 'cl-beads-jbb::row
