@@ -20,7 +20,8 @@
                :stateless-iterators
                :cl-cffi-gtk
                :cl-css
-               :select))
+               :select
+               :closer-mop))
 
 (defsystem :cl-beads/application
   :name :cl-beads/application

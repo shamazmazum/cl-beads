@@ -201,10 +201,6 @@ if needed."
         (eq (gtk-dialog-run dialog) :accept)
     (gtk-widget-destroy dialog))))
 
-(defclass scheme-area-with-ruler (scheme-area ruler-mixin)
-  ()
-  (:metaclass gobject-class))
-
 (defun open-document (document window-callback &key pathname)
   "Open a document in a new window. PATHNAME is a path associated with
 the document (if exists, i.e. the document is not a new
@@ -223,7 +219,10 @@ document's window is created or destroyed."
         (main-box      (make-instance 'gtk-vbox))
 
         (scheme-areas
-         (list (make-instance 'scheme-area-with-ruler
+         (list (make-instance (closer-mop:ensure-class
+                               (gensym)
+                               :metaclass 'gobject-class
+                               :direct-superclasses (mapcar #'find-class '(scheme-area ruler-mixin)))
                               :width-request 200
                               :valign        :fill
                               :vexpand       t
