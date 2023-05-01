@@ -26,10 +26,6 @@
                   :initarg  :ruler-spacing
                   :type     unsigned-byte
                   :accessor scheme-area-ruler-spacing)
-   (draw-ruler-p  :initform nil
-                  :initarg  :draw-ruler-p
-                  :type     boolean
-                  :accessor scheme-area-draw-ruler-p)
    (position      :initform 0d0
                   :initarg  :position
                   :type     double-float
@@ -40,6 +36,15 @@
   (:metaclass gobject-class)
   (:documentation "Widget which shows a scheme (via a model) and
 allows drawing on it."))
+
+(defclass ruler-mixin (gtk-widget)
+  ()
+  (:metaclass gobject-class)
+  (:documentation "Scheme area with a ruler"))
+
+(defgeneric draw-scheme (widget ctx)
+  (:documentation "Draw a scheme on a scheme-area widget.")
+  (:method-combination progn))
 
 (defun draw-bead (ctx rect color outline-color)
   "Draw a bead with position RECT and color COLOR on a cairo context
@@ -112,7 +117,7 @@ CTX."
      (- (* (max (- scheme-height maxy) 0)
            (scheme-area-position scheme-area))))))
 
-(defun draw-scheme (widget ctx)
+(defmethod draw-scheme progn ((widget scheme-area) ctx)
   "Draw a scheme on a scheme-area widget."
   (let ((ctx (pointer ctx))
         (allocation (gtk-widget-get-allocation widget))
@@ -137,23 +142,27 @@ CTX."
     ;; Draw beads
     (si:do-iterator (bead (filter-visible-beads ctx allocation (beads-iterator model)))
       (destructuring-bind (rect . color) bead
-        (draw-bead ctx rect color (scheme-area-outline-color widget))))
+        (draw-bead ctx rect color (scheme-area-outline-color widget))))))
 
-    ;; Emphasize rows
-    (when (scheme-area-draw-ruler-p widget)
-      (let ((color (scheme-area-outline-color widget)))
-        (cairo-set-source-rgb
-         ctx
-         (color-r color)
-         (color-g color)
-         (color-b color)))
-      (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
-      (loop for y from 0d0 below (estimate-height model)
-            by (* (scheme-area-ruler-spacing widget) (bead-size model))
-            when (point-visible-p ctx allocation 0 y) do
-            (cairo-move-to ctx 0 y)
-            (cairo-line-to ctx 1 y)
-            (cairo-stroke ctx)))))
+(defmethod draw-scheme progn ((widget ruler-mixin) ctx)
+  "Draw a scheme on a scheme-area widget."
+  (let ((ctx (pointer ctx))
+        (allocation (gtk-widget-get-allocation widget))
+        (model (scheme-area-model widget))
+        (color (scheme-area-outline-color widget)))
+    (cairo-set-source-rgb
+     ctx
+     (color-r color)
+     (color-g color)
+     (color-b color))
+        ;; Emphasize rows
+    (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
+    (loop for y from 0d0 below (estimate-height model)
+          by (* (scheme-area-ruler-spacing widget) (bead-size model))
+          when (point-visible-p ctx allocation 0 y) do
+          (cairo-move-to ctx 0 y)
+          (cairo-line-to ctx 1 y)
+          (cairo-stroke ctx))))
 
 (defun button-clicked (widget event)
   "Handle button click on a scheme-area. If clicked on a bead, reemit
