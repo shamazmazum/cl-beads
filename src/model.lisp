@@ -19,6 +19,11 @@ control how a scheme is represented in SCHEME-AREA widget)."))
   (width  double-float)
   (height double-float))
 
+(sera:defconstructor bead-spec
+  (rect         rect)
+  (color        color)
+  (linear-index unsigned-byte))
+
 (defgeneric beads-iterator (model)
   (:documentation "Return iterator which iterates over beads in the
 document returning a pair (RECT . COLOR)."))
@@ -57,12 +62,12 @@ as a square."))
     (si:imap
      (lambda (coord)
        (destructuring-bind (i . j) coord
-         (cons
+         (bead-spec
           (rect (+ offset (* j bead-size))
                 (+        (* i bead-size))
                 bead-size bead-size)
-          (palette-color
-           document (aref scheme i j)))))
+          (palette-color document (aref scheme i j))
+          (array-row-major-index scheme i j))))
      (si:product (si:range 0 height)
                  (si:range 0 width)))))
 
@@ -93,7 +98,7 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
      (lambda (idx)
        (multiple-value-bind (q r)
            (floor idx (1+ (* width 2)))
-         (cons
+         (bead-spec
           (if (< r width)
               ;; Short row
               (rect (+ offset (* bead-size (+ r 0.5)))
@@ -103,8 +108,8 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
               (rect (+ offset    (* bead-size (- r width)))
                     (+ bead-size (* bead-size q 2))
                     bead-size bead-size))
-          (palette-color
-           document (row-major-aref scheme idx)))))
+          (palette-color document (row-major-aref scheme idx))
+          idx)))
      (si:range 0 (array-total-size scheme)))))
 
 (defmethod bead-size ((model corrected-model))
@@ -163,9 +168,7 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
                       ;; Invisible bead
                       nil)))))
             (when rect
-              (cons rect
-                    (palette-color
-                     document
-                     (row-major-aref
-                      scheme idx))))))
+              (bead-spec rect
+                         (palette-color document (row-major-aref scheme idx))
+                         idx))))
         (si:range 0 (array-total-size scheme)))))))

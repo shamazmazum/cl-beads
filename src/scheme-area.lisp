@@ -82,9 +82,8 @@ CTX."
     (gdk-rectangle-contains-point allocation x-dev y-dev)))
 
 (defun filter-visible-beads (ctx allocation iterator)
-  (flet ((bead-visible-p (bead)
-           (destructuring-bind (rect . color) bead
-             (declare (ignore color))
+  (flet ((bead-visible-p (bead-spec)
+           (let ((rect (bead-spec-rect bead-spec)))
              (point-visible-p ctx allocation
                               (rect-x rect)
                               (rect-y rect)))))
@@ -133,10 +132,11 @@ CTX."
     (cairo-set-line-width ctx (scheme-area-outline-width widget))
 
     ;; Draw beads
-    (si:do-iterator (bead (filter-visible-beads ctx allocation (beads-iterator model)))
-      (destructuring-bind (rect . color) bead
-        (draw-bead ctx rect color
-                   (document-outline-color (scheme-model-document model)))))))
+    (si:do-iterator (bead-spec (filter-visible-beads ctx allocation (beads-iterator model)))
+      (draw-bead ctx
+                 (bead-spec-rect  bead-spec)
+                 (bead-spec-color bead-spec)
+                 (document-outline-color (scheme-model-document model))))))
 
 (defmethod draw-scheme progn ((widget ruler-mixin) ctx)
   "Draw a scheme on a scheme-area widget."
@@ -171,20 +171,20 @@ as \"my-bead-clicked\"."
               (gdk-rectangle-x allocation))
            (+ (gdk-rectangle-y allocation)
               (gdk-event-button-y event)))
-        (let ((bead-idx
-               (car
-                (si:consume-one
-                 (si:drop-while
-                  (lambda (bead)
-                    (destructuring-bind (n rect . color) bead
-                      (declare (ignore color n))
-                      (not
-                       (and
-                        (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
-                        (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
-                  (si:enumerate (beads-iterator model)))))))
-          (when bead-idx
-            (g-signal-emit widget "my-bead-clicked" bead-idx)))))))
+        (let ((bead-spec
+               (si:consume-one
+                (si:drop-while
+                 (lambda (bead-spec)
+                   (let ((rect (bead-spec-rect bead-spec)))
+                     (not
+                      (and
+                       (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
+                       (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
+                 (beads-iterator model)))))
+          (when bead-spec
+            (g-signal-emit widget
+                           "my-bead-clicked"
+                           (bead-spec-linear-index bead-spec))))))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))
