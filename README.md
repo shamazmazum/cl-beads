@@ -35,7 +35,7 @@ Then run a produced binary.
 * ~~Simulation view~~
 * Some report maybe?
 * ~~Quit confirmation~~
-* Changing color for a range of beads
+* ~~Changing color for a range of beads~~ (Implemented as draw free line tool).
 * Edit history
 * ~~Change color for outline of a bead~~
 * Add support for DB-Bead format.

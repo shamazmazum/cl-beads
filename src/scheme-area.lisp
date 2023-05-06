@@ -7,25 +7,31 @@
   "Default ruler spacing value (in number of beads)")
 
 (defclass scheme-area (gtk-drawing-area)
-  ((model         :initform (error "Specify model")
-                  :initarg  :model
-                  :type     scheme-model
-                  :reader   scheme-area-model)
-   (outline-width :initform *outline-width*
-                  :initarg  :outline-width
-                  :type     double-float
-                  :accessor scheme-area-outline-width)
-   (ruler-spacing :initform *ruler-spacing*
-                  :initarg  :ruler-spacing
-                  :type     unsigned-byte
-                  :accessor scheme-area-ruler-spacing)
-   (position      :initform 0d0
-                  :initarg  :position
-                  :type     double-float
-                  :accessor scheme-area-position)
-   (coord-trans   :initform (cairo-matrix-init-identity)
-                  :type     list
-                  :accessor scheme-area-coord-trans))
+  ((model          :initform (error "Specify model")
+                   :initarg  :model
+                   :type     scheme-model
+                   :reader   scheme-area-model)
+   (outline-width  :initform *outline-width*
+                   :initarg  :outline-width
+                   :type     double-float
+                   :accessor scheme-area-outline-width)
+   (ruler-spacing  :initform *ruler-spacing*
+                   :initarg  :ruler-spacing
+                   :type     unsigned-byte
+                   :accessor scheme-area-ruler-spacing)
+   (position       :initform 0d0
+                   :initarg  :position
+                   :type     double-float
+                   :accessor scheme-area-position)
+   (coord-trans    :initform (cairo-matrix-init-identity)
+                   :type     list
+                   :accessor scheme-area-coord-trans)
+   (free-drawing-p :initform nil
+                   :initarg  :free-drawing-p
+                   :type     boolean
+                   :accessor scheme-area-free-drawing-p
+                   :documentation "When T \"my-bead-clicked\" signal
+is emitted when the mouse pointer is moved and the left mouse button is held."))
   (:metaclass gobject-class)
   (:documentation "Widget which shows a scheme (via a model) and
 allows drawing on it."))
@@ -158,39 +164,55 @@ CTX."
           (cairo-line-to ctx 1 y)
           (cairo-stroke ctx))))
 
+(defun maybe-emit-bead-clicked (area x y)
+  "If (x, y) is a coordinate of a bead emit \"my-bead-clicked\" signal."
+  (let ((allocation (gtk-widget-get-allocation area))
+        (model (scheme-area-model area)))
+    (multiple-value-bind (x y)
+        (cairo-matrix-transform-point
+         (scheme-area-coord-trans area)
+         (+ x (gdk-rectangle-x allocation))
+         (+ y (gdk-rectangle-y allocation)))
+      (alex:when-let
+          ((bead-spec
+            (si:consume-one
+             (si:drop-while
+              (lambda (bead-spec)
+                (let ((rect (bead-spec-rect bead-spec)))
+                  (not
+                   (and
+                    (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
+                    (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
+            (beads-iterator model)))))
+        (g-signal-emit area
+                       "my-bead-clicked"
+                       (bead-spec-linear-index bead-spec))))))
+
 (defun button-clicked (widget event)
-  "Handle button click on a scheme-area. If clicked on a bead, reemit
-as \"my-bead-clicked\"."
-  (when (= (gdk-event-button-button event) 1)
-    (let ((allocation (gtk-widget-get-allocation widget))
-          (model (scheme-area-model widget)))
-      (multiple-value-bind (x y)
-          (cairo-matrix-transform-point
-           (scheme-area-coord-trans widget)
-           (+ (gdk-event-button-x event)
-              (gdk-rectangle-x allocation))
-           (+ (gdk-rectangle-y allocation)
-              (gdk-event-button-y event)))
-        (alex:when-let
-            ((bead-spec
-              (si:consume-one
-               (si:drop-while
-                (lambda (bead-spec)
-                  (let ((rect (bead-spec-rect bead-spec)))
-                    (not
-                     (and
-                      (<= (rect-x rect) x (+ (rect-x rect) (rect-width rect)))
-                      (<= (rect-y rect) y (+ (rect-y rect) (rect-height rect)))))))
-                (beads-iterator model)))))
-          (g-signal-emit widget
-                         "my-bead-clicked"
-                         (bead-spec-linear-index bead-spec)))))))
+  "Handle button click on a scheme-area."
+  (when (and (= (gdk-event-button-button event) 1)
+             (not (scheme-area-free-drawing-p widget)))
+    ;; Left mouse button
+    (maybe-emit-bead-clicked
+     widget
+     (gdk-event-button-x event)
+     (gdk-event-button-y event))))
+
+(defun pointer-moved (widget event)
+  (when (and (member :button1-mask (gdk-event-motion-state event))
+             (scheme-area-free-drawing-p widget))
+    (maybe-emit-bead-clicked
+     widget
+     (gdk-event-motion-x event)
+     (gdk-event-motion-y event))))
 
 (defmethod initialize-instance :after ((scheme-area scheme-area) &rest args)
   (declare (ignore args))
   (g-signal-connect scheme-area "draw" #'draw-scheme)
-  (g-signal-connect scheme-area "button-press-event" #'button-clicked)
-  (gtk-widget-add-events scheme-area '(:button-press-mask)))
+  (g-signal-connect scheme-area "button-press-event"  #'button-clicked)
+  (g-signal-connect scheme-area "motion-notify-event" #'pointer-moved)
+  (gtk-widget-add-events scheme-area '(:button-press-mask
+                                       :pointer-motion-mask)))
 
 (defmethod (setf scheme-area-position) :after (value (scheme-area scheme-area))
   (declare (ignore value))

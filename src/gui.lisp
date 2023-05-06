@@ -130,7 +130,7 @@ if needed."
                   :type     (or null pathname string)
                   :accessor window-document-pathname)
    (active-tool   :initform :pencil
-                  :type     (member :pencil :color-picker)
+                  :type     (member :pencil :line :color-picker)
                   :accessor window-active-tool)
    (dirty-state-p :initform nil
                   :type     boolean
@@ -255,6 +255,13 @@ document's window is created or destroyed."
                 ;; TODO: Redraw only a small area
                 (mapc #'gtk-widget-queue-draw scheme-areas)
                 (setf (window-dirty-state-p window) t))
+               (:line
+                (let ((current-color (document-palette-idx document)))
+                  (unless (= current-color bead-color)
+                    (setf bead-color current-color)
+                    ;; TODO: Redraw only a small area
+                    (mapc #'gtk-widget-queue-draw scheme-areas)
+                    (setf (window-dirty-state-p window) t))))
                (:color-picker
                 (setf (document-palette-idx document) bead-color
                       (palette-button-color current-color)
@@ -336,8 +343,9 @@ document's window is created or destroyed."
       (gtk-box-pack-start toolbar-box edit-box :expand nil :padding 5))
 
     ;; Tools (Pencil / Color pick / Rotation) buttons
-    (let* ((tools-box (make-instance 'gtk-hbox))
-           (pencil (gtk-radio-button-new nil))
+    (let* ((tools-box    (make-instance 'gtk-hbox))
+           (pencil       (gtk-radio-button-new nil))
+           (line         (gtk-radio-button-new-from-widget pencil))
            (color-picker (gtk-radio-button-new-from-widget pencil))
            (rotate-left  (make-stock-button "go-previous"))
            (rotate-right (make-stock-button "go-next")))
@@ -346,20 +354,31 @@ document's window is created or destroyed."
             ;; https://commons.wikimedia.org/wiki/File:Antu_document-edit-sign.svg
             (gtk-image-new-from-file
              (namestring (asdf:system-relative-pathname :cl-beads "pencil.png")))
+            (gtk-button-image line)
+            ;; Converted from this file:
+            ;; https://commons.wikimedia.org/wiki/File:Draw_-_The_Noun_Project.svg
+            (gtk-image-new-from-file
+             (namestring (asdf:system-relative-pathname :cl-beads "draw.png")))
             (gtk-button-image color-picker)
             (gtk-image-new-from-icon-name "gtk-color-picker" :large-toolbar))
 
-      (dolist (button (list pencil color-picker))
-        (gtk-toggle-button-set-mode button nil)
-        (g-signal-connect
-         button "toggled"
-         (lambda (widget)
-           (when (gtk-toggle-button-active widget)
-             (cond
-               ((eq widget pencil)
-                (setf (window-active-tool window) :pencil))
-               ((eq widget color-picker)
-                (setf (window-active-tool window) :color-picker)))))))
+      (flet ((set-free-drawing (area enabledp)
+               (setf (scheme-area-free-drawing-p area) enabledp)))
+        (dolist (button (list pencil line color-picker))
+          (gtk-toggle-button-set-mode button nil)
+          (g-signal-connect
+           button "toggled"
+           (lambda (widget)
+             (when (gtk-toggle-button-active widget)
+               (cond
+                 ((eq widget pencil)
+                  (setf (window-active-tool window) :pencil)
+                  (mapc (alex:rcurry #'set-free-drawing nil) scheme-areas))
+                 ((eq widget line)
+                  (setf (window-active-tool window) :line)
+                  (mapc (alex:rcurry #'set-free-drawing t) scheme-areas))
+                 ((eq widget color-picker)
+                  (setf (window-active-tool window) :color-picker))))))))
 
       (let* ((simulated-area (third scheme-areas))
              (simulated-model (scheme-area-model simulated-area)))
@@ -377,6 +396,7 @@ document's window is created or destroyed."
            (gtk-widget-queue-draw simulated-area))))
 
       (gtk-box-pack-start tools-box pencil       :expand nil)
+      (gtk-box-pack-start tools-box line         :expand nil)
       (gtk-box-pack-start tools-box color-picker :expand nil)
       (gtk-box-pack-start tools-box rotate-left  :expand nil)
       (gtk-box-pack-start tools-box rotate-right :expand nil)
