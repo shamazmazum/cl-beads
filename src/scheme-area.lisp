@@ -15,10 +15,6 @@
                    :initarg  :outline-width
                    :type     double-float
                    :accessor scheme-area-outline-width)
-   (ruler-spacing  :initform *ruler-spacing*
-                   :initarg  :ruler-spacing
-                   :type     unsigned-byte
-                   :accessor scheme-area-ruler-spacing)
    (position       :initform 0d0
                    :initarg  :position
                    :type     double-float
@@ -37,7 +33,10 @@ is emitted when the mouse pointer is moved and the left mouse button is held."))
 allows drawing on it."))
 
 (defclass ruler-mixin (gtk-widget)
-  ()
+  ((ruler-spacing  :initform *ruler-spacing*
+                   :initarg  :ruler-spacing
+                   :type     unsigned-byte
+                   :accessor scheme-area-ruler-spacing))
   (:metaclass gobject-class)
   (:documentation "Scheme area with a ruler"))
 
