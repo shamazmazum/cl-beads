@@ -7,6 +7,7 @@
   :serial t
   :pathname "src"
   :components ((:file "package")
+               (:file "icons")
                (:file "document")
                (:file "jbb-format")
                (:file "model")
@@ -21,7 +22,13 @@
                :cl-cffi-gtk
                :cl-css
                :select
-               :closer-mop))
+               :closer-mop
+
+               ;; For storing icons in the image
+               :flexi-streams
+               :array-operations
+               :opticl
+               :s-base64))
 
 (defsystem :cl-beads/application
   :name :cl-beads/application

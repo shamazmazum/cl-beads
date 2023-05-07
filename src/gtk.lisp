@@ -1,5 +1,35 @@
 ;; Add missing functionality
 
+;; GDK
+(in-package :gdk-pixbuf)
+
+(defcfun ("gdk_pixbuf_new_from_data" %gdk-pixbuf-new-from-data)
+    (g-object gdk-pixbuf :already-referenced)
+  (data            :pointer)
+  (colorspace      gdk-colorspace)
+  (has-alpha       :boolean)
+  (bits-per-sample :int)
+  (width           :int)
+  (height          :int)
+  (rowstride       :int)
+  (destroy-fn      :pointer)
+  (destroy-fn-data :pointer))
+
+(defun gdk-pixbuf-new-from-data (data)
+  (let ((flat-data (make-shareable-byte-vector (array-total-size data))))
+    (map-into flat-data #'identity (aops:flatten data))
+    (with-pointer-to-vector-data (ptr flat-data)
+      (%gdk-pixbuf-new-from-data
+       ptr :rgb
+       (= (array-dimension data 2) 4) 8
+       (array-dimension data 1)
+       (array-dimension data 0)
+       (* (array-dimension data 1)
+          (array-dimension data 2))
+       (null-pointer)
+       (null-pointer)))))
+(export 'gdk-pixbuf-new-from-data)
+
 ;; GTK
 (in-package :gtk)
 

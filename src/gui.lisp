@@ -350,15 +350,9 @@ document's window is created or destroyed."
            (rotate-left  (make-stock-button "go-previous"))
            (rotate-right (make-stock-button "go-next")))
       (setf (gtk-button-image pencil)
-            ;; Converted from this file:
-            ;; https://commons.wikimedia.org/wiki/File:Antu_document-edit-sign.svg
-            (gtk-image-new-from-file
-             (namestring (asdf:system-relative-pathname :cl-beads "pencil.png")))
+            (gtk-image-new-from-pixbuf (gdk-pixbuf-new-from-data *pencil-icon*))
             (gtk-button-image line)
-            ;; Converted from this file:
-            ;; https://commons.wikimedia.org/wiki/File:Draw_-_The_Noun_Project.svg
-            (gtk-image-new-from-file
-             (namestring (asdf:system-relative-pathname :cl-beads "draw.png")))
+            (gtk-image-new-from-pixbuf (gdk-pixbuf-new-from-data *line-icon*))
             (gtk-button-image color-picker)
             (gtk-image-new-from-icon-name "gtk-color-picker" :large-toolbar))
 
