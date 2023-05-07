@@ -1,11 +1,40 @@
 (in-package :cl-beads)
 
+(defclass document-window (gtk-window)
+  ((pathname      :initarg  :pathname
+                  :initform nil
+                  :type     (or null pathname string)
+                  :accessor window-document-pathname)
+   (active-tool   :initform :pencil
+                  :type     (member :pencil :line :color-picker)
+                  :accessor window-active-tool)
+   (dirty-state-p :initform nil
+                  :type     boolean
+                  :accessor window-dirty-state-p
+                  :documentation "If the document is edited but not saved")
+   (callback      :initarg  :callback
+                  :reader   window-callback
+                  :documentation "Callback called on window destruction and creation"))
+  (:metaclass gobject-class)
+  (:documentation "GTK window for editing crochet rope models"))
+
+;; Widget helpers
+(defun make-spin-button (adjustment)
+  "Make a spin button for dialogs"
+  (make-instance 'gtk-spin-button
+                 :orientation :horizontal
+                 :adjustment  adjustment
+                 :climb-rate  1
+                 :digits      0))
+
 (defun make-stock-button (stock-id &rest args)
+  "Make a button with stock image"
   (apply #'make-instance 'gtk-button
          :image (gtk-image-new-from-icon-name stock-id :large-toolbar)
          args))
 
 (defun make-menu-entry (label &rest args &key (stockp t) &allow-other-keys)
+  "Make a menu entry, maybe with stock label"
   (let ((args (alex:remove-from-plist args :stockp)))
     (apply
      #'make-instance 'gtk-image-menu-item
@@ -14,6 +43,13 @@
      :use-stock     stockp
      args)))
 
+(defun set-window-title (window)
+  "Set window title according to the loaded document."
+  (setf (gtk-window-title window)
+        (format nil "cl-beads~@[: ~a~]"
+                (window-document-pathname window))))
+
+;; Dialogs
 (defun open-dialog (parent)
   "Run 'Open Document' dialog and maybe load a document. Return the
 document and its pathname."
@@ -67,90 +103,125 @@ document and its pathname."
             filename))
       (gtk-widget-destroy dialog))))
 
-(defun settings-dialog (parent document areas)
-"Run settings dialog and update the document (and redraw SCHEME-AREAs)
-if needed."
-  (flet ((make-spin-button (adjustment)
-           (make-instance 'gtk-spin-button
-                          :orientation :horizontal
-                          :adjustment  adjustment
-                          :climb-rate  1
-                          :digits      0)))
+(defun clone-dialog (parent document)
+  "Run dialog which performs cloning of rows"
+  (flet ((%make-spin-button ()
+           (make-spin-button
+            (make-instance 'gtk-adjustment
+                           :value          0
+                           :lower          0
+                           :upper          (document-height document)
+                           :step-increment 1
+                           :page-increment 5
+                           :page-size      0))))
     (let ((dialog (make-instance 'gtk-dialog
-                                 :title "Document settings"
+                                 :title         "Row cloning tool"
                                  :transient-for parent
                                  :has-separator t))
-          (width-button (make-spin-button
-                         (make-instance 'gtk-adjustment
-                                        :value          (document-width document)
-                                        :lower          6
-                                        :upper          20
-                                        :step-increment 1
-                                        :page-increment 5
-                                        :page-size      0)))
-          (height-button (make-spin-button
-                          (make-instance 'gtk-adjustment
-                                         :value          (document-height document)
-                                         :lower          100
-                                         :upper          5000
-                                         :step-increment 10
-                                         :page-increment 50
-                                         :page-size      0)))
-          (outline-color (make-instance 'gtk-color-button
-                                        :rgba (color->gdk-rgba
-                                               (document-outline-color document))))
+          (from-button (%make-spin-button))
+          (to-button   (%make-spin-button))
           (box (make-instance 'gtk-vbox)))
+      (gtk-box-pack-start
+       box (make-instance 'gtk-label
+                          :label "Replicate chosen rows infinitely to the top of the scheme.
+There is no undo operation yet. Do not forget to save your document before cloning!"))
+      (let ((%box (make-instance 'gtk-hbox)))
+        (gtk-box-pack-start %box (make-instance 'gtk-label :label "From (including this row):"))
+        (gtk-box-pack-end   %box from-button)
+        (gtk-box-pack-start  box %box))
+      (let ((%box (make-instance 'gtk-hbox)))
+        (gtk-box-pack-start %box (make-instance 'gtk-label :label "To (excluding this row):"))
+        (gtk-box-pack-end   %box to-button)
+        (gtk-box-pack-start  box %box))
 
-      (let ((%box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start %box (make-instance 'gtk-label :label "Width"))
-        (gtk-box-pack-end   %box width-button)
-        (gtk-box-pack-start box %box))
-      (let ((%box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start %box (make-instance 'gtk-label :label "Height"))
-        (gtk-box-pack-end   %box height-button)
-        (gtk-box-pack-start box %box))
-      (let ((%box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
-        (gtk-box-pack-end   %box outline-color)
-        (gtk-box-pack-start box %box))
-      (gtk-dialog-add-button dialog "gtk-ok" :ok)
+      (gtk-dialog-add-button dialog "gtk-ok"     :ok)
       (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
       (gtk-box-pack-start (gtk-dialog-get-content-area dialog) box)
       (gtk-widget-show-all dialog)
       (let ((response (gtk-dialog-run dialog))
-            (width  (floor (gtk-spin-button-value width-button)))
-            (height (floor (gtk-spin-button-value height-button))))
-        (when (eq response :ok)
-          (setf (window-dirty-state-p parent) t
-                (document-outline-color document)
-                (gdk-rgba->color (gtk-color-button-rgba outline-color)))
-          (update-scheme document width height)
-          (mapc #'gtk-widget-queue-draw areas))
-        (gtk-widget-destroy dialog)))))
+            (from (floor (gtk-spin-button-value from-button)))
+            (to   (floor (gtk-spin-button-value to-button))))
+        ;; TODO: Show an error if from >= to
+        (when (and (eq response :ok) (< from to))
+          (setf (window-dirty-state-p parent) t)
+          (clone-rows-up document from to))
+      (gtk-widget-destroy dialog)
+      (eq response :ok)))))
 
-(defclass document-window (gtk-window)
-  ((pathname      :initarg  :pathname
-                  :initform nil
-                  :type     (or null pathname string)
-                  :accessor window-document-pathname)
-   (active-tool   :initform :pencil
-                  :type     (member :pencil :line :color-picker)
-                  :accessor window-active-tool)
-   (dirty-state-p :initform nil
-                  :type     boolean
-                  :accessor window-dirty-state-p
-                  :documentation "If the document is edited but not saved")
-   (callback      :initarg  :callback
-                  :reader   window-callback
-                  :documentation "Callback called on window destruction and creation"))
-  (:metaclass gobject-class)
-  (:documentation "GTK window for editing crochet rope models"))
+(defun settings-dialog (parent document)
+  "Run settings dialog and update the document if needed."
+  (let ((dialog (make-instance 'gtk-dialog
+                               :title         "Document settings"
+                               :transient-for parent
+                               :has-separator t))
+        (width-button (make-spin-button
+                       (make-instance 'gtk-adjustment
+                                      :value          (document-width document)
+                                      :lower          6
+                                      :upper          20
+                                      :step-increment 1
+                                      :page-increment 5
+                                      :page-size      0)))
+        (height-button (make-spin-button
+                        (make-instance 'gtk-adjustment
+                                       :value          (document-height document)
+                                       :lower          100
+                                       :upper          5000
+                                       :step-increment 10
+                                       :page-increment 50
+                                       :page-size      0)))
+        (outline-color (make-instance 'gtk-color-button
+                                      :rgba (color->gdk-rgba
+                                             (document-outline-color document))))
+        (box (make-instance 'gtk-vbox)))
 
-(defun set-window-title (window)
-  (setf (gtk-window-title window)
-        (format nil "cl-beads~@[: ~a~]"
-                (window-document-pathname window))))
+    (let ((%box (make-instance 'gtk-hbox)))
+      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Width"))
+      (gtk-box-pack-end   %box width-button)
+      (gtk-box-pack-start box %box))
+    (let ((%box (make-instance 'gtk-hbox)))
+      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Height"))
+      (gtk-box-pack-end   %box height-button)
+      (gtk-box-pack-start box %box))
+    (let ((%box (make-instance 'gtk-hbox)))
+      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
+      (gtk-box-pack-end   %box outline-color)
+      (gtk-box-pack-start box %box))
+    (gtk-dialog-add-button dialog "gtk-ok" :ok)
+    (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
+    (gtk-box-pack-start (gtk-dialog-get-content-area dialog) box)
+    (gtk-widget-show-all dialog)
+    (let ((response (gtk-dialog-run dialog))
+          (width  (floor (gtk-spin-button-value width-button)))
+          (height (floor (gtk-spin-button-value height-button))))
+      (when (eq response :ok)
+        (setf (window-dirty-state-p parent) t
+              (document-outline-color document)
+              (gdk-rgba->color (gtk-color-button-rgba outline-color)))
+        (update-scheme document width height))
+      (gtk-widget-destroy dialog)
+      (eq response :ok))))
 
+(defun quit-dialog (parent)
+  "Ask if we should close the window. Return T if we should."
+  (let* ((dialog (gtk-dialog-new-with-buttons
+                  "Are you sure?"
+                  parent
+                  nil
+                  "gtk-ok" :accept
+                  "gtk-cancel" :reject))
+         (content-area (gtk-dialog-get-content-area dialog)))
+    (gtk-container-add
+     content-area
+     (make-instance 'gtk-label
+                    :label  "There are unsaved changes. Are you sure you want to quit?"))
+    (setf (gtk-container-border-width content-area) 12)
+    (gtk-widget-show-all content-area)
+    (prog1
+        (eq (gtk-dialog-run dialog) :accept)
+    (gtk-widget-destroy dialog))))
+
+;; Button and menu entries handlers
 (defun new-handler (parent widget)
   (declare (ignore widget))
   (open-document (make-instance 'document)
@@ -186,25 +257,7 @@ if needed."
     (t
      (save-as-handler parent document widget))))
 
-(defun quit-dialog (parent)
-  "Ask if we should close the window. Return T if we should."
-  (let* ((dialog (gtk-dialog-new-with-buttons
-                  "Are you sure?"
-                  parent
-                  nil
-                  "gtk-ok" :accept
-                  "gtk-cancel" :reject))
-         (content-area (gtk-dialog-get-content-area dialog)))
-    (gtk-container-add
-     content-area
-     (make-instance 'gtk-label
-                    :label  "There are unsaved changes. Are you sure you want to quit?"))
-    (setf (gtk-container-border-width content-area) 12)
-    (gtk-widget-show-all content-area)
-    (prog1
-        (eq (gtk-dialog-run dialog) :accept)
-    (gtk-widget-destroy dialog))))
-
+;; Main stuff
 (defun open-document (document window-callback &key pathname)
   "Open a document in a new window. PATHNAME is a path associated with
 the document (if exists, i.e. the document is not a new
@@ -408,7 +461,8 @@ document's window is created or destroyed."
        pref-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (settings-dialog window document scheme-areas)))
+         (when (settings-dialog window document)
+           (mapc #'gtk-widget-queue-draw scheme-areas))))
 
       (gtk-box-pack-start settings-box pref-button :expand nil)
       (gtk-box-pack-start toolbar-box settings-box :expand nil :padding 5))
@@ -527,10 +581,25 @@ document's window is created or destroyed."
                                     :label "_Edit"
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
-          (item-edit-undo (make-menu-entry "gtk-undo" :sensitive nil))
-          (item-edit-redo (make-menu-entry "gtk-redo" :sensitive nil)))
+          (item-edit-undo  (make-menu-entry "gtk-undo"    :sensitive nil))
+          (item-edit-redo  (make-menu-entry "gtk-redo"    :sensitive nil))
+          (item-edit-clone (make-menu-entry "_Clone rows" :stockp nil)))
+
+      (g-signal-connect
+       item-edit-clone "activate"
+       (lambda (widget)
+         (declare (ignore widget))
+         (let ((draft-area (first scheme-areas)))
+           (setf (scheme-area-show-markings-p draft-area) t)
+           (gtk-widget-queue-draw draft-area)
+           (when (clone-dialog window document)
+             (mapc #'gtk-widget-queue-draw (cdr scheme-areas)))
+           (setf (scheme-area-show-markings-p draft-area) nil)
+           (gtk-widget-queue-draw draft-area))))
+
       (gtk-menu-shell-append submenu item-edit-undo)
       (gtk-menu-shell-append submenu item-edit-redo)
+      (gtk-menu-shell-append submenu item-edit-clone)
       (setf (gtk-menu-item-submenu item-edit) submenu)
       (gtk-menu-shell-append menu-bar item-edit))
 
@@ -545,7 +614,8 @@ document's window is created or destroyed."
        item-settings-pref "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (settings-dialog window document scheme-areas)))
+         (when (settings-dialog window document)
+           (mapc #'gtk-widget-queue-draw scheme-areas))))
 
       (gtk-menu-shell-append submenu item-settings-pref)
       (setf (gtk-menu-item-submenu item-settings) submenu)

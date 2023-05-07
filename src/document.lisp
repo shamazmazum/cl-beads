@@ -154,3 +154,24 @@
          (values unsigned-byte &optional))
 (defun document-width (document)
   (array-dimension (document-scheme document) 1))
+
+(sera:-> clone-rows-up (document unsigned-byte unsigned-byte)
+         (values document &optional))
+(defun clone-rows-up (document from to)
+  "Replicate rows from FROM to TO periodically from TO+1 to the end of
+the document."
+  (assert (< from to))
+  (let ((scheme (document-scheme document))
+        (width  (document-width  document))
+        (height (document-height document))
+        (length (- to from)))
+    (loop with selection = (select:select scheme
+                             (select:range from to)
+                             (select:range 0 width))
+          for start from to by length
+          while (< (+ start length -1) height) do
+          (setf (select:select scheme
+                  (select:range start (+ start length))
+                  (select:range 0 width))
+                selection)))
+  document)
