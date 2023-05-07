@@ -33,10 +33,14 @@ is emitted when the mouse pointer is moved and the left mouse button is held."))
 allows drawing on it."))
 
 (defclass ruler-mixin (gtk-widget)
-  ((ruler-spacing  :initform *ruler-spacing*
-                   :initarg  :ruler-spacing
-                   :type     unsigned-byte
-                   :accessor scheme-area-ruler-spacing))
+  ((ruler-spacing   :initform *ruler-spacing*
+                    :initarg  :ruler-spacing
+                    :type     unsigned-byte
+                    :accessor scheme-area-ruler-spacing)
+   (show-markings-p :initform nil
+                    :initarg  :show-markings-p
+                    :accessor scheme-area-show-markings-p
+                    :type     boolean))
   (:metaclass gobject-class)
   (:documentation "Scheme area with a ruler"))
 
@@ -148,20 +152,41 @@ CTX."
   (let ((ctx (pointer ctx))
         (allocation (gtk-widget-get-allocation widget))
         (model (scheme-area-model widget)))
+    ;; Set color
     (let ((color (document-outline-color (scheme-model-document model))))
       (cairo-set-source-rgb
        ctx
        (color-r color)
        (color-g color)
        (color-b color)))
-        ;; Emphasize rows
+
+    ;; Set font
+    (when (scheme-area-show-markings-p widget)
+      (cairo-select-font-face ctx "DejaVu Sans" :normal :bold)
+      (cairo-set-font-size ctx (* 2 (bead-size model))))
+
+    ;; Emphasize rows
     (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
-    (loop for y from 0d0 below (estimate-height model)
-          by (* (scheme-area-ruler-spacing widget) (bead-size model))
+    (loop for row from 0 below (document-height
+                                (scheme-model-document model))
+          by (scheme-area-ruler-spacing widget)
+          for y = (* (bead-size model) row)
           when (point-visible-p ctx allocation 0 y) do
           (cairo-move-to ctx 0 y)
           (cairo-line-to ctx 1 y)
-          (cairo-stroke ctx))))
+          (cairo-stroke ctx)
+          (when (scheme-area-show-markings-p widget)
+            (let* ((text (format nil "~d" row))
+                   (extents (cairo-text-extents ctx text)))
+              (cairo-move-to
+               ctx
+               (+ (bead-size model) (cairo-text-extents-t-x-bearing extents))
+               (+ (bead-size model) y))
+              (cairo-save ctx)
+              (cairo-rotate ctx pi)
+              (cairo-scale ctx -1 1)
+              (cairo-show-text ctx text)
+              (cairo-restore ctx))))))
 
 (defun maybe-emit-bead-clicked (area x y)
   "If (x, y) is a coordinate of a bead emit \"my-bead-clicked\" signal."

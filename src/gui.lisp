@@ -224,7 +224,7 @@ document's window is created or destroyed."
 
         (scheme-areas
          (list (make-instance (closer-mop:ensure-class
-                               (gensym)
+                               'scheme-area-with-ruler
                                :metaclass 'gobject-class
                                :direct-superclasses (mapcar #'find-class '(scheme-area ruler-mixin)))
                               :width-request 200
