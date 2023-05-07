@@ -3,9 +3,19 @@
 ;; GDK
 (in-package :gdk-pixbuf)
 
+(defun initialize-pixbuf-space (array)
+  (declare (type (simple-array (unsigned-byte 8)) array))
+  (foreign-alloc :uint8
+                 :count (array-total-size array)
+                 :initial-contents (coerce (aops:flatten array) 'list)))
+
+(defcallback free-pixbuf-space :void ((ptr (:pointer :uint8)) (data :pointer))
+  (declare (ignore data))
+  (foreign-free ptr))
+
 (defcfun ("gdk_pixbuf_new_from_data" %gdk-pixbuf-new-from-data)
     (g-object gdk-pixbuf :already-referenced)
-  (data            :pointer)
+  (data            (:pointer :uint8))
   (colorspace      gdk-colorspace)
   (has-alpha       :boolean)
   (bits-per-sample :int)
@@ -16,18 +26,15 @@
   (destroy-fn-data :pointer))
 
 (defun gdk-pixbuf-new-from-data (data)
-  (let ((flat-data (make-shareable-byte-vector (array-total-size data))))
-    (map-into flat-data #'identity (aops:flatten data))
-    (with-pointer-to-vector-data (ptr flat-data)
-      (%gdk-pixbuf-new-from-data
-       ptr :rgb
-       (= (array-dimension data 2) 4) 8
-       (array-dimension data 1)
-       (array-dimension data 0)
-       (* (array-dimension data 1)
-          (array-dimension data 2))
-       (null-pointer)
-       (null-pointer)))))
+  (%gdk-pixbuf-new-from-data
+   (initialize-pixbuf-space data) :rgb
+   (= (array-dimension data 2) 4) 8
+   (array-dimension data 1)
+   (array-dimension data 0)
+   (* (array-dimension data 1)
+      (array-dimension data 2))
+   (callback free-pixbuf-space)
+   (null-pointer)))
 (export 'gdk-pixbuf-new-from-data)
 
 ;; GTK
@@ -48,7 +55,7 @@
 
 (defcfun ("gtk_render_background" %gtk-render-background) :void
   (context (g-object gtk-style-context))
-  (cr      :pointer)
+  (cr      (:pointer (:struct cairo:cairo-t)))
   (x       :double)
   (y       :double)
   (width   :double)
