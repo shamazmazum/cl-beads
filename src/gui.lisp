@@ -1,14 +1,18 @@
 (in-package :cl-beads)
 
-(defun make-stock-button (stock-id)
-  (make-instance 'gtk-button
-                 :image (gtk-image-new-from-icon-name stock-id :large-toolbar)))
+(defun make-stock-button (stock-id &rest args)
+  (apply #'make-instance 'gtk-button
+         :image (gtk-image-new-from-icon-name stock-id :large-toolbar)
+         args))
 
-(defun make-menu-entry (label &key (stockp t))
-  (make-instance 'gtk-image-menu-item
-                 :label         label
-                 :use-underline t
-                 :use-stock     stockp))
+(defun make-menu-entry (label &rest args &key (stockp t) &allow-other-keys)
+  (let ((args (alex:remove-from-plist args :stockp)))
+    (apply
+     #'make-instance 'gtk-image-menu-item
+     :label         label
+     :use-underline t
+     :use-stock     stockp
+     args)))
 
 (defun open-dialog (parent)
   "Run 'Open Document' dialog and maybe load a document. Return the
@@ -336,8 +340,8 @@ document's window is created or destroyed."
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
-          (undo-button (make-stock-button "edit-undo"))
-          (redo-button (make-stock-button "edit-redo")))
+          (undo-button (make-stock-button "edit-undo" :sensitive nil))
+          (redo-button (make-stock-button "edit-redo" :sensitive nil)))
       (gtk-box-pack-start edit-box undo-button :expand nil)
       (gtk-box-pack-start edit-box redo-button :expand nil)
       (gtk-box-pack-start toolbar-box edit-box :expand nil :padding 5))
@@ -523,8 +527,8 @@ document's window is created or destroyed."
                                     :label "_Edit"
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
-          (item-edit-undo (make-menu-entry "gtk-undo"))
-          (item-edit-redo (make-menu-entry "gtk-redo")))
+          (item-edit-undo (make-menu-entry "gtk-undo" :sensitive nil))
+          (item-edit-redo (make-menu-entry "gtk-redo" :sensitive nil)))
       (gtk-menu-shell-append submenu item-edit-undo)
       (gtk-menu-shell-append submenu item-edit-redo)
       (setf (gtk-menu-item-submenu item-edit) submenu)
