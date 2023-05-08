@@ -136,7 +136,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
       (gtk-dialog-add-button dialog "gtk-ok"     :ok)
       (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
-      (gtk-box-pack-start (gtk-dialog-get-content-area dialog) box)
+      (gtk-container-add (gtk-dialog-get-content-area dialog) box)
       (gtk-widget-show-all dialog)
       (let ((response (gtk-dialog-run dialog))
             (from (floor (gtk-spin-button-value from-button)))
@@ -189,7 +189,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
       (gtk-box-pack-start box %box))
     (gtk-dialog-add-button dialog "gtk-ok" :ok)
     (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
-    (gtk-box-pack-start (gtk-dialog-get-content-area dialog) box)
+    (gtk-container-add (gtk-dialog-get-content-area dialog) box)
     (gtk-widget-show-all dialog)
     (let ((response (gtk-dialog-run dialog))
           (width  (floor (gtk-spin-button-value width-button)))
