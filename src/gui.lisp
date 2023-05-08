@@ -50,42 +50,47 @@
                 (window-document-pathname window))))
 
 ;; Dialogs
+(defun error-dialog (parent situation condition)
+  "Print a report about abnormal operation. SITUATION is a string
+which descripts a situation. CONDITION is printed in addition to
+SITUATION."
+  (let ((dialog (gtk-dialog-new-with-buttons "Error" parent nil
+                                             "gtk-ok" :none))
+        (box (make-instance 'gtk-vbox)))
+    (gtk-container-add (gtk-dialog-get-content-area dialog) box)
+    (gtk-box-pack-start box (make-instance 'gtk-label :label situation))
+    (gtk-box-pack-start box (make-instance 'gtk-label
+                                           :label (with-output-to-string (out)
+                                                    (princ condition out))))
+    (gtk-widget-show-all dialog)
+    (gtk-dialog-run dialog)
+    (gtk-widget-destroy dialog)))
+
 (defun open-dialog (parent)
   "Run 'Open Document' dialog and maybe load a document. Return the
 document and its pathname."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Open Document"
-                 parent
-                 :open
+                 parent :open
                  "gtk-cancel" :cancel
-                 "gtk-open"   :accept))
+                 "gtk-open"   :ok))
         (filter (make-instance 'gtk-file-filter)))
     (gtk-file-filter-add-pattern filter "*.jbb")
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
-    (let ((pathname
-           (prog1
-               (when (eq (gtk-dialog-run dialog) :accept)
-                 (gtk-file-chooser-get-filename dialog))
-             (gtk-widget-destroy dialog))))
-      (when pathname
-        (handler-case
-            (values
-             (read-jbb pathname)
-             pathname)
-          (error (c)
-            ;; TODO: Do something
-            (princ c)
-            nil))))))
+    (unwind-protect
+        (when (eq (gtk-dialog-run dialog) :ok)
+          (let ((pathname (gtk-file-chooser-get-filename dialog)))
+            (values (read-jbb pathname) pathname)))
+      (gtk-widget-destroy dialog))))
 
 (defun save-dialog (parent document)
   "Run 'Save Document' dialog and maybe save the document."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Save Document"
-                 parent
-                 :save
+                 parent :save
                  "gtk-cancel" :cancel
-                 "gtk-save" :accept))
+                 "gtk-save"   :ok))
         (filter (make-instance 'gtk-file-filter)))
     (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
     (let ((pathname (window-document-pathname parent)))
@@ -95,9 +100,8 @@ document and its pathname."
     (gtk-file-filter-add-pattern filter "*.jbb")
     (gtk-file-filter-set-name    filter "JBead file")
     (gtk-file-chooser-add-filter dialog filter)
-
-    (prog1
-        (when (eq (gtk-dialog-run dialog) :accept)
+    (unwind-protect
+        (when (eq (gtk-dialog-run dialog) :ok)
           (let ((filename (gtk-file-chooser-get-filename dialog)))
             (write-jbb document filename)
             filename))
@@ -114,10 +118,11 @@ document and its pathname."
                            :step-increment 1
                            :page-increment 5
                            :page-size      0))))
-    (let ((dialog (make-instance 'gtk-dialog
-                                 :title         "Row cloning tool"
-                                 :transient-for parent
-                                 :has-separator t))
+    (let ((dialog (gtk-dialog-new-with-buttons
+                 "Row cloning tool"
+                 parent nil
+                 "gtk-ok"     :ok
+                 "gtk-cancel" :cancel))
           (from-button (%make-spin-button))
           (to-button   (%make-spin-button))
           (box (make-instance 'gtk-vbox)))
@@ -134,8 +139,6 @@ There is no undo operation yet. Do not forget to save your document before cloni
         (gtk-box-pack-end   %box to-button)
         (gtk-box-pack-start  box %box))
 
-      (gtk-dialog-add-button dialog "gtk-ok"     :ok)
-      (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
       (gtk-container-add (gtk-dialog-get-content-area dialog) box)
       (gtk-widget-show-all dialog)
       (let ((response (gtk-dialog-run dialog))
@@ -150,10 +153,11 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defun settings-dialog (parent document)
   "Run settings dialog and update the document if needed."
-  (let ((dialog (make-instance 'gtk-dialog
-                               :title         "Document settings"
-                               :transient-for parent
-                               :has-separator t))
+  (let ((dialog (gtk-dialog-new-with-buttons
+                 "Document settings"
+                 parent nil
+                 "gtk-ok"     :ok
+                 "gtk-cancel" :cancel))
         (width-button (make-spin-button
                        (make-instance 'gtk-adjustment
                                       :value          (document-width document)
@@ -187,8 +191,6 @@ There is no undo operation yet. Do not forget to save your document before cloni
       (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
       (gtk-box-pack-end   %box outline-color)
       (gtk-box-pack-start box %box))
-    (gtk-dialog-add-button dialog "gtk-ok" :ok)
-    (gtk-dialog-add-button dialog "gtk-cancel" :cancel)
     (gtk-container-add (gtk-dialog-get-content-area dialog) box)
     (gtk-widget-show-all dialog)
     (let ((response (gtk-dialog-run dialog))
@@ -206,10 +208,9 @@ There is no undo operation yet. Do not forget to save your document before cloni
   "Ask if we should close the window. Return T if we should."
   (let* ((dialog (gtk-dialog-new-with-buttons
                   "Are you sure?"
-                  parent
-                  nil
-                  "gtk-ok" :accept
-                  "gtk-cancel" :reject))
+                  parent nil
+                  "gtk-ok"     :ok
+                  "gtk-cancel" :cancel))
          (content-area (gtk-dialog-get-content-area dialog)))
     (gtk-container-add
      content-area
@@ -218,7 +219,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
     (setf (gtk-container-border-width content-area) 12)
     (gtk-widget-show-all content-area)
     (prog1
-        (eq (gtk-dialog-run dialog) :accept)
+        (eq (gtk-dialog-run dialog) :ok)
     (gtk-widget-destroy dialog))))
 
 ;; Button and menu entries handlers
@@ -229,11 +230,15 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defun open-in-new-window-handler (parent widget)
   (declare (ignore widget))
-  (multiple-value-bind (document pathname)
-      (open-dialog parent)
-    (when document
-      (set-window-title
-       (open-document document (window-callback parent) :pathname pathname)))))
+  (handler-case
+      (multiple-value-bind (document pathname)
+          (open-dialog parent)
+        (when document
+          (set-window-title
+           (open-document document (window-callback parent) :pathname pathname))))
+    (invalid-file (c)
+      (error-dialog parent "Cannot open a file" c)
+      ())))
 
 (defun open-handler (parent widget)
   (when (and (open-in-new-window-handler parent widget)
@@ -256,6 +261,14 @@ There is no undo operation yet. Do not forget to save your document before cloni
      (setf (window-dirty-state-p parent) nil))
     (t
      (save-as-handler parent document widget))))
+
+(defun safe-save-handler (handler)
+  "Invoke a save handler HANDLER which always finishes normally."
+  (lambda (parent document widget)
+    (handler-case
+        (funcall handler parent document widget)
+      (output-error (c)
+        (error-dialog parent "Save error" c)))))
 
 ;; Main stuff
 (defun open-document (document window-callback &key pathname)
@@ -389,7 +402,7 @@ document's window is created or destroyed."
        (alex:curry #'open-handler window))
       (g-signal-connect
        save-button "clicked"
-       (alex:curry #'save-handler window document)))
+       (alex:curry (safe-save-handler #'save-handler) window document)))
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
@@ -563,10 +576,10 @@ document's window is created or destroyed."
        (alex:curry #'open-in-new-window-handler window))
       (g-signal-connect
        item-file-save "activate"
-       (alex:curry #'save-handler window document))
+       (alex:curry (safe-save-handler #'save-handler) window document))
       (g-signal-connect
        item-file-save-as "activate"
-       (alex:curry #'save-as-handler window document))
+       (alex:curry (safe-save-handler #'save-as-handler) window document))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)

@@ -2,13 +2,27 @@
 
 (defpackage cl-beads-jbb)
 
-(define-condition invalid-file (error)
-  ((pathname :reader  invalid-file-pathname
-             :initarg :pathname))
+(define-condition cl-beads-error (error)
+  ((pathname    :reader  invalid-file-pathname
+                :initarg :pathname)
+   (description :reader  invalid-file-description
+                :initarg :description)))
+
+(define-condition invalid-file (cl-beads-error)
+  ()
   (:report
    (lambda (c s)
-     (format s "Invalid input file ~a"
-             (invalid-file-pathname c)))))
+     (format s "Invalid input file ~a (~a)"
+             (invalid-file-pathname    c)
+             (invalid-file-description c)))))
+
+(define-condition output-error (cl-beads-error)
+  ()
+  (:report
+   (lambda (c s)
+     (format s "Error occured while writing to ~a (~a)"
+             (invalid-file-pathname    c)
+             (invalid-file-description c)))))
 
 (sera:-> parse-color (list)
          (values color &optional))
@@ -19,21 +33,23 @@
            (/ g 255d0)
            (/ b 255d0))))
 
-(sera:-> read-jbb ((or pathname string))
+(sera:-> %read-jbb ((or pathname string))
          (values document &optional))
-(defun read-jbb (pathname)
+(defun %read-jbb (pathname)
   "Read a document from JBead file format."
   (let ((content (uiop:safe-read-file-form
                   pathname
                   :package :cl-beads-jbb)))
     (unless (and (listp content)
                  (eq (car content) 'cl-beads-jbb::jbb))
-      (error 'invalid-file :pathname pathname))
+      (error 'invalid-file :pathname pathname :description "Not a JBead file"))
     (let ((content (cdr content)))
       ;; Check version
       (let ((version (assoc 'cl-beads-jbb::version content)))
         (unless (= (second version) 1)
-          (error 'invalid-file :pathname pathname)))
+          (error 'invalid-file
+                 :pathname pathname
+                 :description "Wrong version")))
       (make-instance 'document
                      :palette
                      (let ((colors (mapcar #'parse-color
@@ -56,9 +72,21 @@
                                    :element-type 'unsigned-byte
                                    :initial-contents model))))))
 
-(sera:-> write-jbb (document (or pathname string))
+(sera:-> read-jbb ((or pathname string))
+         (values document &optional))
+(defun read-jbb (pathname)
+  (handler-case
+      (%read-jbb pathname)
+    ;; Resignal all errors as invalid-file
+    ((and error (not invalid-file)) (c)
+      (error 'invalid-file
+             :pathname pathname
+             :description (with-output-to-string (out)
+                            (princ c out))))))
+
+(sera:-> %write-jbb (document (or pathname string))
          (values list &optional))
-(defun write-jbb (document pathname)
+(defun %write-jbb (document pathname)
   "Write a document to JBead file format"
   (let ((form `(cl-beads-jbb::jbb
                 (cl-beads-jbb::version 1)
@@ -110,3 +138,14 @@
                :stream output
                :case   :downcase)))
     form))
+
+(sera:-> write-jbb (document (or pathname string))
+         (values list &optional))
+(defun write-jbb (document pathname)
+  (handler-case
+      (%write-jbb document pathname)
+    ;; Resignal all errors as output-error
+    (error (c) (error 'output-error
+                      :pathname pathname
+                      :description (with-output-to-string (out)
+                                     (princ c out))))))
