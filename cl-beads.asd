@@ -15,6 +15,7 @@
                (:file "signals")
                (:file "palette-button")
                (:file "scheme-area")
+               (:file "document-frame")
                (:file "gui"))
   :depends-on (:serapeum
                :alexandria

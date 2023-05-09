@@ -1,22 +1,16 @@
 (in-package :cl-beads)
 
 (defclass document-window (gtk-window)
-  ((pathname      :initarg  :pathname
-                  :initform nil
-                  :type     (or null pathname string)
-                  :accessor window-document-pathname)
-   (active-tool   :initform :pencil
-                  :type     (member :pencil :line :color-picker)
-                  :accessor window-active-tool)
-   (dirty-state-p :initform nil
-                  :type     boolean
-                  :accessor window-dirty-state-p
-                  :documentation "If the document is edited but not saved")
-   (callback      :initarg  :callback
-                  :reader   window-callback
-                  :documentation "Callback called on window destruction and creation"))
+  ((callback       :initarg  :callback
+                   :initform (error "Specify :callback")
+                   :reader   window-callback
+                   :documentation "Callback called on window destruction and creation")
+   (document-frame :initarg  :document-frame
+                   :initform (error "Specify :document-frame")
+                   :type     document-frame
+                   :reader   window-document-frame))
   (:metaclass gobject-class)
-  (:documentation "GTK window for editing crochet rope models"))
+  (:documentation "Class for main window in cl-beads app"))
 
 ;; Widget helpers
 (defun make-spin-button (adjustment)
@@ -47,7 +41,8 @@
   "Set window title according to the loaded document."
   (setf (gtk-window-title window)
         (format nil "cl-beads~@[: ~a~]"
-                (window-document-pathname window))))
+                (frame-pathname
+                 (window-document-frame window)))))
 
 ;; Dialogs
 (defun error-dialog (parent situation condition)
@@ -84,16 +79,17 @@ document and its pathname."
             (values (read-jbb pathname) pathname)))
       (gtk-widget-destroy dialog))))
 
-(defun save-dialog (parent document)
+(defun save-dialog (parent)
   "Run 'Save Document' dialog and maybe save the document."
   (let ((dialog (gtk-file-chooser-dialog-new
                  "Save Document"
                  parent :save
                  "gtk-cancel" :cancel
                  "gtk-save"   :ok))
-        (filter (make-instance 'gtk-file-filter)))
+        (filter (make-instance 'gtk-file-filter))
+        (frame (window-document-frame parent)))
     (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
-    (let ((pathname (window-document-pathname parent)))
+    (let ((pathname (frame-pathname frame)))
       (if pathname
           (gtk-file-chooser-set-filename dialog pathname)
           (gtk-file-chooser-set-current-name dialog "Untitled.jbb")))
@@ -103,57 +99,61 @@ document and its pathname."
     (unwind-protect
         (when (eq (gtk-dialog-run dialog) :ok)
           (let ((filename (gtk-file-chooser-get-filename dialog)))
-            (write-jbb document filename)
+            (write-jbb (frame-document frame) filename)
             filename))
       (gtk-widget-destroy dialog))))
 
-(defun clone-dialog (parent document)
+(defun clone-dialog (parent)
   "Run dialog which performs cloning of rows"
-  (flet ((%make-spin-button ()
-           (make-spin-button
-            (make-instance 'gtk-adjustment
-                           :value          0
-                           :lower          0
-                           :upper          (document-height document)
-                           :step-increment 1
-                           :page-increment 5
-                           :page-size      0))))
-    (let ((dialog (gtk-dialog-new-with-buttons
-                 "Row cloning tool"
-                 parent nil
-                 "gtk-ok"     :ok
-                 "gtk-cancel" :cancel))
-          (from-button (%make-spin-button))
-          (to-button   (%make-spin-button))
-          (box (make-instance 'gtk-vbox)))
-      (gtk-box-pack-start
-       box (make-instance 'gtk-label
-                          :label "Replicate chosen rows infinitely to the top of the scheme.
+  (let ((frame (window-document-frame parent)))
+    (flet ((%make-spin-button ()
+             (make-spin-button
+              (make-instance 'gtk-adjustment
+                             :value          0
+                             :lower          0
+                             :upper          (document-height (frame-document frame))
+                             :step-increment 1
+                             :page-increment 5
+                             :page-size      0))))
+      (let ((dialog (gtk-dialog-new-with-buttons
+                     "Row cloning tool"
+                     parent nil
+                     "gtk-ok"     :ok
+                     "gtk-cancel" :cancel))
+            (from-button (%make-spin-button))
+            (to-button   (%make-spin-button))
+            (box (make-instance 'gtk-vbox)))
+
+        (gtk-box-pack-start
+         box (make-instance 'gtk-label
+                            :label "Replicate chosen rows infinitely to the top of the scheme.
 There is no undo operation yet. Do not forget to save your document before cloning!"))
-      (let ((%box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start %box (make-instance 'gtk-label :label "From (including this row):"))
-        (gtk-box-pack-end   %box from-button)
-        (gtk-box-pack-start  box %box))
-      (let ((%box (make-instance 'gtk-hbox)))
-        (gtk-box-pack-start %box (make-instance 'gtk-label :label "To (excluding this row):"))
-        (gtk-box-pack-end   %box to-button)
-        (gtk-box-pack-start  box %box))
+        (let ((%box (make-instance 'gtk-hbox)))
+          (gtk-box-pack-start %box (make-instance 'gtk-label :label "From (including this row):"))
+          (gtk-box-pack-end   %box from-button)
+          (gtk-box-pack-start  box %box))
+        (let ((%box (make-instance 'gtk-hbox)))
+          (gtk-box-pack-start %box (make-instance 'gtk-label :label "To (excluding this row):"))
+          (gtk-box-pack-end   %box to-button)
+          (gtk-box-pack-start  box %box))
 
-      (gtk-container-add (gtk-dialog-get-content-area dialog) box)
-      (gtk-widget-show-all dialog)
-      (let ((response (gtk-dialog-run dialog))
-            (from (floor (gtk-spin-button-value from-button)))
-            (to   (floor (gtk-spin-button-value to-button))))
-        ;; TODO: Show an error if from >= to
-        (when (and (eq response :ok) (< from to))
-          (setf (window-dirty-state-p parent) t)
-          (clone-rows-up document from to))
-      (gtk-widget-destroy dialog)
-      (eq response :ok)))))
+        (gtk-container-add (gtk-dialog-get-content-area dialog) box)
+        (gtk-widget-show-all dialog)
+        (let ((response (gtk-dialog-run dialog))
+              (from (floor (gtk-spin-button-value from-button)))
+              (to   (floor (gtk-spin-button-value to-button))))
+          ;; TODO: Show an error if from >= to
+          (when (and (eq response :ok) (< from to))
+            (setf (frame-dirty-state-p frame) t)
+            (clone-rows-up (frame-document frame) from to))
+          (gtk-widget-destroy dialog)
+          (eq response :ok))))))
 
-(defun settings-dialog (parent document)
+(defun settings-dialog (parent)
   "Run settings dialog and update the document if needed."
-  (let ((dialog (gtk-dialog-new-with-buttons
+  (let* ((frame    (window-document-frame parent))
+         (document (frame-document frame))
+         (dialog (gtk-dialog-new-with-buttons
                  "Document settings"
                  parent nil
                  "gtk-ok"     :ok
@@ -197,7 +197,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
           (width  (floor (gtk-spin-button-value width-button)))
           (height (floor (gtk-spin-button-value height-button))))
       (when (eq response :ok)
-        (setf (window-dirty-state-p parent) t
+        (setf (frame-dirty-state-p frame) t
               (document-outline-color document)
               (gdk-rgba->color (gtk-color-button-rgba outline-color)))
         (update-scheme document width height))
@@ -206,18 +206,18 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defun quit-dialog (parent)
   "Ask if we should close the window. Return T if we should."
-  (let* ((dialog (gtk-dialog-new-with-buttons
-                  "Are you sure?"
-                  parent nil
-                  "gtk-ok"     :ok
-                  "gtk-cancel" :cancel))
-         (content-area (gtk-dialog-get-content-area dialog)))
+  (let ((dialog (gtk-dialog-new-with-buttons
+                 "Are you sure?"
+                 parent nil
+                 "gtk-ok"     :ok
+                 "gtk-cancel" :cancel)))
     (gtk-container-add
-     content-area
+     (gtk-dialog-get-content-area dialog)
      (make-instance 'gtk-label
-                    :label  "There are unsaved changes. Are you sure you want to quit?"))
-    (setf (gtk-container-border-width content-area) 12)
-    (gtk-widget-show-all content-area)
+                    :label          "There are unsaved changes. Are you sure you want to quit?"
+                    :height-request 40
+                    :valign         :center))
+    (gtk-widget-show-all dialog)
     (prog1
         (eq (gtk-dialog-run dialog) :ok)
     (gtk-widget-destroy dialog))))
@@ -242,31 +242,35 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defun open-handler (parent widget)
   (when (and (open-in-new-window-handler parent widget)
-             (not (window-dirty-state-p parent)))
+             (not (frame-dirty-state-p
+                   (window-document-frame parent))))
     ;; Close the existing window if an associated document is saved
     (gtk-widget-destroy parent)))
 
-(defun save-as-handler (parent document widget)
+(defun save-as-handler (parent widget)
   (declare (ignore widget))
-  (let ((pathname (save-dialog parent document)))
+  (let ((frame (window-document-frame parent))
+        (pathname (save-dialog parent)))
     (when pathname
-      (setf (window-document-pathname parent) pathname
-            (window-dirty-state-p     parent) nil)
+      (setf (frame-pathname      frame) pathname
+            (frame-dirty-state-p frame) nil)
       (set-window-title parent))))
 
-(defun save-handler (parent document widget)
-  (cond
-    ((window-document-pathname parent)
-     (write-jbb document (window-document-pathname parent))
-     (setf (window-dirty-state-p parent) nil))
-    (t
-     (save-as-handler parent document widget))))
+(defun save-handler (parent widget)
+  (let ((frame (window-document-frame parent)))
+    (cond
+      ((frame-pathname frame)
+       (write-jbb (frame-document frame)
+                  (frame-pathname frame))
+       (setf (frame-dirty-state-p frame) nil))
+      (t
+       (save-as-handler parent widget)))))
 
 (defun safe-save-handler (handler)
   "Invoke a save handler HANDLER which always finishes normally."
-  (lambda (parent document widget)
+  (lambda (parent widget)
     (handler-case
-        (funcall handler parent document widget)
+        (funcall handler parent widget)
       (output-error (c)
         (error-dialog parent "Save error" c)))))
 
@@ -276,41 +280,23 @@ There is no undo operation yet. Do not forget to save your document before cloni
 the document (if exists, i.e. the document is not a new
 document). WINDOW-CALLBACK is a callback which is called when the
 document's window is created or destroyed."
-  (let ((window (make-instance 'document-window
-                               :title          "cl-beads"
-                               :default-width  600
-                               :default-height 800
-                               :pathname pathname
-                               :callback window-callback))
+  (let* ((menu-bar       (make-instance 'gtk-menu-bar))
+         (workspace-box  (make-instance 'gtk-hbox))
+         (toolbar-box    (make-instance 'gtk-hbox))
+         (main-box       (make-instance 'gtk-vbox))
+         (current-color  (make-instance 'palette-button :sensitive nil))
+         (document-frame (make-instance 'rope-frame
+                                        :document document
+                                        :pathname pathname))
+         (window (make-instance 'document-window
+                                :title          "cl-beads"
+                                :callback       window-callback
+                                :document-frame document-frame
+                                :default-width  600
+                                :default-height 800)))
 
-        (menu-bar      (make-instance 'gtk-menu-bar))
-        (workspace-box (make-instance 'gtk-hbox))
-        (toolbar-box   (make-instance 'gtk-hbox))
-        (main-box      (make-instance 'gtk-vbox))
-
-        (scheme-areas
-         (list (make-instance (closer-mop:ensure-class
-                               'scheme-area-with-ruler
-                               :metaclass 'gobject-class
-                               :direct-superclasses (mapcar #'find-class '(scheme-area ruler-mixin)))
-                              :width-request 200
-                              :valign        :fill
-                              :vexpand       t
-                              :model         (make-instance 'draft-model :document document))
-               (make-instance 'scheme-area
-                              :width-request 200
-                              :valign        :fill
-                              :vexpand       t
-                              :model         (make-instance 'corrected-model :document document))
-               (make-instance 'scheme-area
-                              :width-request 200
-                              :valign        :fill
-                              :vexpand       t
-                              :model         (make-instance 'simulated-model :document document))))
-        (current-color (make-instance 'palette-button :sensitive nil)))
-
-    ;; Handle click on a bead
-    (dolist (area scheme-areas)
+        ;; Handle click on a bead
+    (dolist (area (frame-scheme-areas document-frame))
       (g-signal-connect
        area "my-bead-clicked"
        (lambda (widget bead-idx)
@@ -318,20 +304,20 @@ document's window is created or destroyed."
          (when (< bead-idx (array-total-size (document-scheme document)))
            ;; How can it be otherwise?
            (symbol-macrolet ((bead-color (row-major-aref (document-scheme document) bead-idx)))
-             (ecase (window-active-tool window)
+             (ecase (frame-active-tool document-frame)
                (:pencil
                 (let ((current-color (document-palette-idx document)))
                   (setf bead-color (if (= bead-color current-color) 0 current-color)))
                 ;; TODO: Redraw only a small area
-                (mapc #'gtk-widget-queue-draw scheme-areas)
-                (setf (window-dirty-state-p window) t))
+                (redraw-scheme-areas document-frame)
+                (setf (frame-dirty-state-p document-frame) t))
                (:line
                 (let ((current-color (document-palette-idx document)))
                   (unless (= current-color bead-color)
                     (setf bead-color current-color)
                     ;; TODO: Redraw only a small area
-                    (mapc #'gtk-widget-queue-draw scheme-areas)
-                    (setf (window-dirty-state-p window) t))))
+                    (redraw-scheme-areas document-frame)
+                    (setf (frame-dirty-state-p document-frame) t))))
                (:color-picker
                 (setf (document-palette-idx document) bead-color
                       (palette-button-color current-color)
@@ -342,47 +328,13 @@ document's window is created or destroyed."
      window "delete-event"
      (lambda (widget event)
        (declare (ignore widget event))
-       (when (window-dirty-state-p window)
+       (when (frame-dirty-state-p document-frame)
          (not (quit-dialog window)))))
 
     ;; Call WINDOW-CALLBACK when the window is closed
     (g-signal-connect window "destroy" (alex:curry window-callback :close))
 
-    ;; A scroll bar
-    (let ((adjustment (make-instance 'gtk-adjustment
-                                     :lower 0.0
-                                     :value 1.0
-                                     :upper 1.0
-                                     :step-increment 0.02
-                                     :page-increment 0.2)))
-      (g-signal-connect
-       adjustment "value-changed"
-       (lambda (object)
-         (declare (ignore object))
-         (dolist (area scheme-areas)
-           (setf (scheme-area-position area)
-                 (- 1 (gtk-adjustment-value adjustment))))))
-
-      (gtk-box-pack-start
-       workspace-box
-       (make-instance 'gtk-scrollbar
-                      :orientation :vertical
-                      :adjustment  adjustment)
-       :expand nil))
-
-    ;; A frame with three drawing areas
-    (let ((frame-grid    (make-instance 'gtk-grid))
-          (frame         (make-instance 'gtk-frame)))
-      (setf (gtk-grid-column-spacing frame-grid) 20)
-      (loop for area in scheme-areas
-            for x from 0 by 1 do
-            (gtk-grid-attach frame-grid area x 0 1 1))
-      (loop for label in '("Draft" "Corrected" "Simulation")
-            for x from 0 by 1 do
-            (gtk-grid-attach frame-grid (make-instance 'gtk-label :label label)
-                             x 1 1 1))
-      (gtk-container-add frame frame-grid)
-      (gtk-box-pack-start workspace-box frame :expand nil))
+    (gtk-box-pack-start workspace-box document-frame :expand nil)
 
     ;; New / Open / Save buttons 
     (let ((document-box (make-instance 'gtk-hbox))
@@ -402,7 +354,7 @@ document's window is created or destroyed."
        (alex:curry #'open-handler window))
       (g-signal-connect
        save-button "clicked"
-       (alex:curry (safe-save-handler #'save-handler) window document)))
+       (alex:curry (safe-save-handler #'save-handler) window)))
 
     ;; Undo / Redo buttons (currently not functional)
     (let ((edit-box (make-instance 'gtk-hbox))
@@ -436,15 +388,17 @@ document's window is created or destroyed."
              (when (gtk-toggle-button-active widget)
                (cond
                  ((eq widget pencil)
-                  (setf (window-active-tool window) :pencil)
-                  (mapc (alex:rcurry #'set-free-drawing nil) scheme-areas))
+                  (setf (frame-active-tool document-frame) :pencil)
+                  (mapc (alex:rcurry #'set-free-drawing nil)
+                        (frame-scheme-areas document-frame)))
                  ((eq widget line)
-                  (setf (window-active-tool window) :line)
-                  (mapc (alex:rcurry #'set-free-drawing t) scheme-areas))
+                  (setf (frame-active-tool document-frame) :line)
+                  (mapc (alex:rcurry #'set-free-drawing t)
+                        (frame-scheme-areas document-frame)))
                  ((eq widget color-picker)
-                  (setf (window-active-tool window) :color-picker))))))))
+                  (setf (frame-active-tool document-frame) :color-picker))))))))
 
-      (let* ((simulated-area (third scheme-areas))
+      (let* ((simulated-area (third (frame-scheme-areas document-frame)))
              (simulated-model (scheme-area-model simulated-area)))
         (g-signal-connect
          rotate-left "clicked"
@@ -474,8 +428,8 @@ document's window is created or destroyed."
        pref-button "clicked"
        (lambda (widget)
          (declare (ignore widget))
-         (when (settings-dialog window document)
-           (mapc #'gtk-widget-queue-draw scheme-areas))))
+         (when (settings-dialog window)
+           (redraw-scheme-areas document-frame))))
 
       (gtk-box-pack-start settings-box pref-button :expand nil)
       (gtk-box-pack-start toolbar-box settings-box :expand nil :padding 5))
@@ -519,9 +473,9 @@ document's window is created or destroyed."
                      (palette-button-color background-button)
                      (palette-button-color color-button))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw scheme-areas)
+              (redraw-scheme-areas document-frame)
               ;; Set dirty state
-              (setf (window-dirty-state-p window) t)))
+              (setf (frame-dirty-state-p document-frame) t)))
 
            (g-signal-connect
             color-button "my-color-set"
@@ -533,9 +487,9 @@ document's window is created or destroyed."
                 (setf (palette-button-color current-color)
                       (current-color document)))
               ;; Redraw areas
-              (mapc #'gtk-widget-queue-draw scheme-areas)
+              (redraw-scheme-areas document-frame)
               ;; Set dirty state
-              (setf (window-dirty-state-p window) t)))
+              (setf (frame-dirty-state-p document-frame) t)))
            background-button))
        nil (si:range 0 (palette-length document)))
 
@@ -576,10 +530,10 @@ document's window is created or destroyed."
        (alex:curry #'open-in-new-window-handler window))
       (g-signal-connect
        item-file-save "activate"
-       (alex:curry (safe-save-handler #'save-handler) window document))
+       (alex:curry (safe-save-handler #'save-handler) window))
       (g-signal-connect
        item-file-save-as "activate"
-       (alex:curry (safe-save-handler #'save-as-handler) window document))
+       (alex:curry (safe-save-handler #'save-as-handler) window))
       (g-signal-connect
        item-file-quit "activate"
        (lambda (widget)
@@ -598,15 +552,16 @@ document's window is created or destroyed."
           (item-edit-redo  (make-menu-entry "gtk-redo"    :sensitive nil))
           (item-edit-clone (make-menu-entry "_Clone rows" :stockp nil)))
 
+      ;; FIXME: Cloning should not be possible for all types of documents
       (g-signal-connect
        item-edit-clone "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (let ((draft-area (first scheme-areas)))
+         (let ((draft-area (first (frame-scheme-areas document-frame))))
            (setf (scheme-area-show-markings-p draft-area) t)
            (gtk-widget-queue-draw draft-area)
-           (when (clone-dialog window document)
-             (mapc #'gtk-widget-queue-draw (cdr scheme-areas)))
+           (when (clone-dialog window)
+             (mapc #'gtk-widget-queue-draw (cdr (frame-scheme-areas document-frame))))
            (setf (scheme-area-show-markings-p draft-area) nil)
            (gtk-widget-queue-draw draft-area))))
 
@@ -627,16 +582,16 @@ document's window is created or destroyed."
        item-settings-pref "activate"
        (lambda (widget)
          (declare (ignore widget))
-         (when (settings-dialog window document)
-           (mapc #'gtk-widget-queue-draw scheme-areas))))
+         (when (settings-dialog window)
+           (redraw-scheme-areas document-frame))))
 
       (gtk-menu-shell-append submenu item-settings-pref)
       (setf (gtk-menu-item-submenu item-settings) submenu)
       (gtk-menu-shell-append menu-bar item-settings))
 
     ;; Pack everyting and call the callback
-    (gtk-box-pack-start main-box menu-bar :expand nil)
-    (gtk-box-pack-start main-box toolbar-box :expand nil)
+    (gtk-box-pack-start main-box menu-bar      :expand nil)
+    (gtk-box-pack-start main-box toolbar-box   :expand nil)
     (gtk-box-pack-end   main-box workspace-box :padding 2)
 
     (gtk-container-add window main-box)
