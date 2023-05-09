@@ -225,7 +225,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
 ;; Button and menu entries handlers
 (defun new-handler (parent widget)
   (declare (ignore widget))
-  (open-document (make-instance 'document)
+  (open-document (make-instance 'document-rope)
                  (window-callback parent)))
 
 (defun open-in-new-window-handler (parent widget)
@@ -657,7 +657,7 @@ document's window is created or destroyed."
                  (:open
                   (push window windows)
                   (gtk-widget-show-all window)))))
-        (open-document (make-instance 'document) #'callback)))))
+        (open-document (make-instance 'document-rope) #'callback)))))
 
 (defun main ()
   "Entry point for a stand-alone application"

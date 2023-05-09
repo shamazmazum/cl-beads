@@ -65,12 +65,6 @@
     (COLOR 0.0d0 0.0d0 0.0d0)))
   "Initial palette for a newly created document.")
 
-(defparameter *default-width* 15
-  "Initial width of the scheme.")
-
-(defparameter *default-height* 200
-  "Initial height of the scheme.")
-
 (defparameter *default-outline-color* (color 0d0 0d0 0d0)
   "Default color for bead outline.")
 
@@ -83,12 +77,7 @@
                   :initarg  :palette-idx
                   :type     unsigned-byte
                   :accessor document-palette-idx)
-   (scheme        :initform (make-array (list *default-height*
-                                              *default-width*)
-                                        :element-type 'unsigned-byte
-                                        ;; Initialize with background color
-                                        :initial-element 0)
-                  :initarg  :scheme
+   (scheme        :initarg  :scheme
                   :type     scheme
                   :accessor document-scheme)
    (outline-color :initform *default-outline-color*
@@ -106,7 +95,8 @@
    (notes         :initform ""
                   :initarg  :organization
                   :type     string
-                  :accessor document-notes)))
+                  :accessor document-notes))
+  (:documentation "A generic class for a document"))
 
 (defgeneric palette-color (document index)
   (:documentation "Accessor for a particular color from the document's palette."))
@@ -175,3 +165,37 @@ the document."
                   (select:range 0 width))
                 selection)))
   document)
+
+;; Document types
+
+(defun make-scheme (height width)
+  (make-array (list height width)
+              :element-type 'unsigned-byte
+              ;; Initialize with background color
+              :initial-element 0))
+
+(defparameter *default-rope-width* 15
+  "Initial width of a scheme (beaded rope).")
+
+(defparameter *default-rope-height* 200
+  "Initial height of a scheme (beaded rope).")
+
+(defclass document-rope (document)
+  ()
+  (:default-initargs
+   :scheme (make-scheme *default-rope-height*
+                        *default-rope-width*))
+  (:documentation "A document for a beaded crochet rope"))
+
+(defparameter *default-ring-width* 100
+  "Initial width of a scheme (ring).")
+
+(defparameter *default-ring-height* 6
+  "Initial height of a scheme (ring).")
+
+(defclass document-ring (document)
+  ()
+  (:default-initargs
+   :scheme (make-scheme *default-ring-height*
+                        *default-ring-width*))
+  (:documentation "A document for a ring in mosaic technique"))
