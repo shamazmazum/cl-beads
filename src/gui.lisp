@@ -149,6 +149,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
           (gtk-widget-destroy dialog)
           (eq response :ok))))))
 
+;; TODO: different lower and upper bounds for different document types
 (defun settings-dialog (parent)
   "Run settings dialog and update the document if needed."
   (let* ((frame    (window-document-frame parent))
@@ -285,9 +286,7 @@ document's window is created or destroyed."
          (toolbar-box    (make-instance 'gtk-hbox))
          (main-box       (make-instance 'gtk-vbox))
          (current-color  (make-instance 'palette-button :sensitive nil))
-         (document-frame (make-instance 'rope-frame
-                                        :document document
-                                        :pathname pathname))
+         (document-frame (make-document-frame document :pathname pathname))
          (window (make-instance 'document-window
                                 :title          "cl-beads"
                                 :callback       window-callback

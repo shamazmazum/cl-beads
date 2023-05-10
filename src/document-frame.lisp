@@ -20,10 +20,16 @@
   (:metaclass gobject-class)
   (:documentation "Generic class for a frame with scheme areas"))
 
+(defgeneric make-document-frame (document &key pathname)
+  (:documentation "Make a frame which contains all widgets necessary
+to edit the document. Different document types may result in different
+frame types."))
+
 (defun redraw-scheme-areas (document-frame)
   (mapc #'gtk-widget-queue-draw
         (frame-scheme-areas document-frame)))
 
+;; ROPE-FRAME
 (defclass rope-frame (document-frame)
   ()
   (:metaclass gobject-class)
@@ -90,3 +96,8 @@
 
     ;; Add frame box to the frame
     (gtk-container-add frame frame-box)))
+
+(defmethod make-document-frame ((document document-rope) &key pathname)
+  (make-instance 'rope-frame
+                 :document document
+                 :pathname pathname))
