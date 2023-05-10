@@ -103,52 +103,6 @@ document and its pathname."
             filename))
       (gtk-widget-destroy dialog))))
 
-(defun clone-dialog (parent)
-  "Run dialog which performs cloning of rows"
-  (let ((frame (window-document-frame parent)))
-    (flet ((%make-spin-button ()
-             (make-spin-button
-              (make-instance 'gtk-adjustment
-                             :value          0
-                             :lower          0
-                             :upper          (document-height (frame-document frame))
-                             :step-increment 1
-                             :page-increment 5
-                             :page-size      0))))
-      (let ((dialog (gtk-dialog-new-with-buttons
-                     "Row cloning tool"
-                     parent nil
-                     "gtk-ok"     :ok
-                     "gtk-cancel" :cancel))
-            (from-button (%make-spin-button))
-            (to-button   (%make-spin-button))
-            (box (make-instance 'gtk-vbox)))
-
-        (gtk-box-pack-start
-         box (make-instance 'gtk-label
-                            :label "Replicate chosen rows infinitely to the top of the scheme.
-There is no undo operation yet. Do not forget to save your document before cloning!"))
-        (let ((%box (make-instance 'gtk-hbox)))
-          (gtk-box-pack-start %box (make-instance 'gtk-label :label "From (including this row):"))
-          (gtk-box-pack-end   %box from-button)
-          (gtk-box-pack-start  box %box))
-        (let ((%box (make-instance 'gtk-hbox)))
-          (gtk-box-pack-start %box (make-instance 'gtk-label :label "To (excluding this row):"))
-          (gtk-box-pack-end   %box to-button)
-          (gtk-box-pack-start  box %box))
-
-        (gtk-container-add (gtk-dialog-get-content-area dialog) box)
-        (gtk-widget-show-all dialog)
-        (let ((response (gtk-dialog-run dialog))
-              (from (floor (gtk-spin-button-value from-button)))
-              (to   (floor (gtk-spin-button-value to-button))))
-          ;; TODO: Show an error if from >= to
-          (when (and (eq response :ok) (< from to))
-            (setf (frame-dirty-state-p frame) t)
-            (clone-rows-up (frame-document frame) from to))
-          (gtk-widget-destroy dialog)
-          (eq response :ok))))))
-
 (defun adjustments-for-scheme-dimensions (document)
   "Make two gtk-adjustment objects for spin buttons which control
 width and height of a scheme."
@@ -567,26 +521,19 @@ document's window is created or destroyed."
                                     :label "_Edit"
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
-          (item-edit-undo  (make-menu-entry "gtk-undo"    :sensitive nil))
-          (item-edit-redo  (make-menu-entry "gtk-redo"    :sensitive nil))
-          (item-edit-clone (make-menu-entry "_Clone rows" :stockp nil)))
-
-      ;; TODO: Cloning should not be possible for all types of documents
-      (g-signal-connect
-       item-edit-clone "activate"
-       (lambda (widget)
-         (declare (ignore widget))
-         (let ((draft-area (first (frame-scheme-areas document-frame))))
-           (setf (scheme-area-show-markings-p draft-area) t)
-           (gtk-widget-queue-draw draft-area)
-           (when (clone-dialog window)
-             (mapc #'gtk-widget-queue-draw (cdr (frame-scheme-areas document-frame))))
-           (setf (scheme-area-show-markings-p draft-area) nil)
-           (gtk-widget-queue-draw draft-area))))
-
+          (item-edit-undo  (make-menu-entry "gtk-undo" :sensitive nil))
+          (item-edit-redo  (make-menu-entry "gtk-redo" :sensitive nil))
+          (additional-items (additional-edit-tools document-frame)))
       (gtk-menu-shell-append submenu item-edit-undo)
       (gtk-menu-shell-append submenu item-edit-redo)
-      (gtk-menu-shell-append submenu item-edit-clone)
+      (dolist (item additional-items)
+        (let ((menu-entry (make-menu-entry (car item) :stockp nil)))
+          (gtk-menu-shell-append submenu menu-entry)
+          (g-signal-connect
+           menu-entry "activate"
+           (lambda (widget)
+             (declare (ignore widget))
+             (funcall (cdr item) window document-frame)))))
       (setf (gtk-menu-item-submenu item-edit) submenu)
       (gtk-menu-shell-append menu-bar item-edit))
 
