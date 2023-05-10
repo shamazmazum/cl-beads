@@ -34,7 +34,7 @@
            (/ b 255d0))))
 
 (sera:-> %read-jbb ((or pathname string))
-         (values document &optional))
+         (values document-rope &optional))
 (defun %read-jbb (pathname)
   "Read a document from JBead file format."
   (let ((content (uiop:safe-read-file-form
@@ -50,7 +50,7 @@
           (error 'invalid-file
                  :pathname pathname
                  :description "Wrong version")))
-      (make-instance 'document
+      (make-instance 'document-rope
                      :palette
                      (let ((colors (mapcar #'parse-color
                                     (alex:assoc-value content 'cl-beads-jbb::colors))))
@@ -73,7 +73,7 @@
                                    :initial-contents model))))))
 
 (sera:-> read-jbb ((or pathname string))
-         (values document &optional))
+         (values document-rope &optional))
 (defun read-jbb (pathname)
   (handler-case
       (%read-jbb pathname)
