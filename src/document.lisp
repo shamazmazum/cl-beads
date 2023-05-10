@@ -98,6 +98,15 @@
                   :accessor document-notes))
   (:documentation "A generic class for a document"))
 
+(sera:defconstructor scheme-bounds
+  (minimal-width  unsigned-byte)
+  (minimal-height unsigned-byte)
+  (maximal-width  unsigned-byte)
+  (maximal-height unsigned-byte))
+
+(defgeneric sensible-bounds (document)
+  (:documentation "Return sensible bounds for height and width of a scheme"))
+
 (defgeneric palette-color (document index)
   (:documentation "Accessor for a particular color from the document's palette."))
 
@@ -187,6 +196,9 @@ the document."
                         *default-rope-width*))
   (:documentation "A document for a beaded crochet rope"))
 
+(defmethod sensible-bounds ((document document-rope))
+  (scheme-bounds 6 100 20 5000))
+
 (defparameter *default-ring-width* 60
   "Initial width of a scheme (ring).")
 
@@ -199,3 +211,6 @@ the document."
    :scheme (make-scheme *default-ring-height*
                         *default-ring-width*))
   (:documentation "A document for a ring in mosaic technique"))
+
+(defmethod sensible-bounds ((document document-ring))
+  (scheme-bounds 30 4 60 10))

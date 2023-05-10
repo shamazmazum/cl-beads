@@ -149,61 +149,71 @@ There is no undo operation yet. Do not forget to save your document before cloni
           (gtk-widget-destroy dialog)
           (eq response :ok))))))
 
-;; TODO: different lower and upper bounds for different document types
+(defun adjustments-for-scheme-dimensions (document)
+  "Make two gtk-adjustment objects for spin buttons which control
+width and height of a scheme."
+  (labels ((range-big-p (min max)
+             (> (- max min) 100))
+           (make-adjustment (current min max)
+             (make-instance 'gtk-adjustment
+                            :value          current
+                            :lower          min
+                            :upper          max
+                            :step-increment (if (range-big-p min max) 10 1)
+                            :page-increment (if (range-big-p min max) 50 5)
+                            :page-size      0)))
+    (let ((bounds (sensible-bounds document)))
+      (values
+       (make-adjustment
+        (document-width document)
+        (scheme-bounds-minimal-width bounds)
+        (scheme-bounds-maximal-width bounds))
+       (make-adjustment
+        (document-height document)
+        (scheme-bounds-minimal-height bounds)
+        (scheme-bounds-maximal-height bounds))))))
+
 (defun settings-dialog (parent)
   "Run settings dialog and update the document if needed."
-  (let* ((frame    (window-document-frame parent))
+  (let* ((frame (window-document-frame parent))
          (document (frame-document frame))
          (dialog (gtk-dialog-new-with-buttons
-                 "Document settings"
-                 parent nil
-                 "gtk-ok"     :ok
-                 "gtk-cancel" :cancel))
-        (width-button (make-spin-button
-                       (make-instance 'gtk-adjustment
-                                      :value          (document-width document)
-                                      :lower          6
-                                      :upper          20
-                                      :step-increment 1
-                                      :page-increment 5
-                                      :page-size      0)))
-        (height-button (make-spin-button
-                        (make-instance 'gtk-adjustment
-                                       :value          (document-height document)
-                                       :lower          100
-                                       :upper          5000
-                                       :step-increment 10
-                                       :page-increment 50
-                                       :page-size      0)))
-        (outline-color (make-instance 'gtk-color-button
-                                      :rgba (color->gdk-rgba
-                                             (document-outline-color document))))
-        (box (make-instance 'gtk-vbox)))
-
-    (let ((%box (make-instance 'gtk-hbox)))
-      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Width"))
-      (gtk-box-pack-end   %box width-button)
-      (gtk-box-pack-start box %box))
-    (let ((%box (make-instance 'gtk-hbox)))
-      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Height"))
-      (gtk-box-pack-end   %box height-button)
-      (gtk-box-pack-start box %box))
-    (let ((%box (make-instance 'gtk-hbox)))
-      (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
-      (gtk-box-pack-end   %box outline-color)
-      (gtk-box-pack-start box %box))
-    (gtk-container-add (gtk-dialog-get-content-area dialog) box)
-    (gtk-widget-show-all dialog)
-    (let ((response (gtk-dialog-run dialog))
-          (width  (floor (gtk-spin-button-value width-button)))
-          (height (floor (gtk-spin-button-value height-button))))
-      (when (eq response :ok)
-        (setf (frame-dirty-state-p frame) t
-              (document-outline-color document)
-              (gdk-rgba->color (gtk-color-button-rgba outline-color)))
-        (update-scheme document width height))
-      (gtk-widget-destroy dialog)
-      (eq response :ok))))
+                  "Document settings"
+                  parent nil
+                  "gtk-ok"     :ok
+                  "gtk-cancel" :cancel))
+         (outline-color (make-instance 'gtk-color-button
+                                       :rgba (color->gdk-rgba
+                                              (document-outline-color document))))
+         (box (make-instance 'gtk-vbox)))
+    (multiple-value-bind (width-adjustment height-adjustment)
+        (adjustments-for-scheme-dimensions document)
+      (let ((width-button  (make-spin-button width-adjustment))
+            (height-button (make-spin-button height-adjustment)))
+        (let ((%box (make-instance 'gtk-hbox)))
+          (gtk-box-pack-start %box (make-instance 'gtk-label :label "Width"))
+          (gtk-box-pack-end   %box width-button)
+          (gtk-box-pack-start box %box))
+        (let ((%box (make-instance 'gtk-hbox)))
+          (gtk-box-pack-start %box (make-instance 'gtk-label :label "Height"))
+          (gtk-box-pack-end   %box height-button)
+          (gtk-box-pack-start box %box))
+        (let ((%box (make-instance 'gtk-hbox)))
+          (gtk-box-pack-start %box (make-instance 'gtk-label :label "Bead outline color"))
+          (gtk-box-pack-end   %box outline-color)
+          (gtk-box-pack-start box %box))
+        (gtk-container-add (gtk-dialog-get-content-area dialog) box)
+        (gtk-widget-show-all dialog)
+        (let ((response (gtk-dialog-run dialog))
+              (width  (floor (gtk-spin-button-value width-button)))
+              (height (floor (gtk-spin-button-value height-button))))
+          (when (eq response :ok)
+            (setf (frame-dirty-state-p frame) t
+                  (document-outline-color document)
+                  (gdk-rgba->color (gtk-color-button-rgba outline-color)))
+            (update-scheme document width height))
+          (gtk-widget-destroy dialog)
+          (eq response :ok))))))
 
 (defun quit-dialog (parent)
   "Ask if we should close the window. Return T if we should."
