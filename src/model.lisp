@@ -117,6 +117,7 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
     (min *maximum-bead-size*
          (float (/ (1+ (document-width document))) 0d0))))
 
+;; Simulated
 (defclass simulated-model (scheme-model)
   ((rotation :initform 0
              :initarg  :rotation
@@ -172,3 +173,34 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
                        (palette-color document (row-major-aref scheme idx))
                        idx)))
         (si:range 0 (array-total-size scheme)))))))
+
+;; Rings in mosaic technique
+(defclass ring-model (scheme-model)
+  ()
+  (:documentation "A model for rings in mosaic technique"))
+
+(defmethod beads-iterator ((model ring-model))
+  (let* ((document (scheme-model-document model))
+         (width  (document-width  document))
+         (height (document-height document))
+         (scheme (document-scheme document))
+         (bead-size (bead-size model))
+         (offset (/ (- 1 (* bead-size (+ 5d-1 width))) 2)))
+    (si:imap
+     (lambda (coord)
+       (destructuring-bind (i . j) coord
+         (bead-spec
+          (rect (+ offset
+                   (if (evenp i) (* 5d-1  bead-size) 0)
+                   (* j bead-size))
+                (+ (* i bead-size))
+                bead-size bead-size)
+          (palette-color document (aref scheme i j))
+          (array-row-major-index scheme i j))))
+     (si:product (si:range 0 height)
+                 (si:range 0 width)))))
+
+(defmethod bead-size ((model ring-model))
+  (let ((document (scheme-model-document model)))
+    (min *maximum-bead-size*
+         (/ (+ 5d-1 (document-width document))))))

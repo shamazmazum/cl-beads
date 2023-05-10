@@ -229,6 +229,11 @@ There is no undo operation yet. Do not forget to save your document before cloni
   (open-document (make-instance 'document-rope)
                  (window-callback parent)))
 
+(defun new-ring-handler (parent widget)
+  (declare (ignore widget))
+  (open-document (make-instance 'document-ring)
+                 (window-callback parent)))
+
 (defun open-in-new-window-handler (parent widget)
   (declare (ignore widget))
   (handler-case
@@ -282,6 +287,7 @@ the document (if exists, i.e. the document is not a new
 document). WINDOW-CALLBACK is a callback which is called when the
 document's window is created or destroyed."
   (let* ((menu-bar       (make-instance 'gtk-menu-bar))
+         ;; TODO: some document frames may prefer vbox
          (workspace-box  (make-instance 'gtk-hbox))
          (toolbar-box    (make-instance 'gtk-hbox))
          (main-box       (make-instance 'gtk-vbox))
@@ -397,20 +403,20 @@ document's window is created or destroyed."
                  ((eq widget color-picker)
                   (setf (frame-active-tool document-frame) :color-picker))))))))
 
-      (let* ((simulated-area (third (frame-scheme-areas document-frame)))
-             (simulated-model (scheme-area-model simulated-area)))
-        (g-signal-connect
-         rotate-left "clicked"
-         (lambda (widget)
-           (declare (ignore widget))
-           (decf (simulated-model-rotation simulated-model))
-           (gtk-widget-queue-draw simulated-area)))
-        (g-signal-connect
-         rotate-right "clicked"
-         (lambda (widget)
-           (declare (ignore widget))
-           (incf (simulated-model-rotation simulated-model))
-           (gtk-widget-queue-draw simulated-area))))
+      (alex:when-let ((simulation-area (simulation-area document-frame)))
+        (let ((simulation-model (scheme-area-model simulation-area)))
+          (g-signal-connect
+           rotate-left "clicked"
+           (lambda (widget)
+             (declare (ignore widget))
+             (decf (simulated-model-rotation simulation-model))
+             (gtk-widget-queue-draw simulation-area)))
+          (g-signal-connect
+           rotate-right "clicked"
+           (lambda (widget)
+             (declare (ignore widget))
+             (incf (simulated-model-rotation simulation-model))
+             (gtk-widget-queue-draw simulation-area)))))
 
       (gtk-box-pack-start tools-box pencil       :expand nil)
       (gtk-box-pack-start tools-box line         :expand nil)
@@ -505,12 +511,14 @@ document's window is created or destroyed."
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
           (item-file-new      (make-menu-entry "gtk-new"))
+          (item-file-new-ring (make-menu-entry "New _ring" :stockp nil))
           (item-file-open     (make-menu-entry "gtk-open"))
           (item-file-open-new (make-menu-entry "Open in new _window" :stockp nil))
           (item-file-save     (make-menu-entry "gtk-save"))
           (item-file-save-as  (make-menu-entry "gtk-save-as"))
           (item-file-quit     (make-menu-entry "gtk-quit")))
       (gtk-menu-shell-append submenu item-file-new)
+      (gtk-menu-shell-append submenu item-file-new-ring)
       (gtk-menu-shell-append submenu item-file-open)
       (gtk-menu-shell-append submenu item-file-open-new)
       (gtk-menu-shell-append submenu item-file-save)
@@ -521,6 +529,9 @@ document's window is created or destroyed."
       (g-signal-connect
        item-file-new "activate"
        (alex:curry #'new-handler window))
+      (g-signal-connect
+       item-file-new-ring "activate"
+       (alex:curry #'new-ring-handler window))
       (g-signal-connect
        item-file-open "activate"
        (alex:curry #'open-handler window))
@@ -551,7 +562,7 @@ document's window is created or destroyed."
           (item-edit-redo  (make-menu-entry "gtk-redo"    :sensitive nil))
           (item-edit-clone (make-menu-entry "_Clone rows" :stockp nil)))
 
-      ;; FIXME: Cloning should not be possible for all types of documents
+      ;; TODO: Cloning should not be possible for all types of documents
       (g-signal-connect
        item-edit-clone "activate"
        (lambda (widget)

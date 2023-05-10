@@ -25,6 +25,13 @@
 to edit the document. Different document types may result in different
 frame types."))
 
+(defgeneric simulation-area (frame)
+  (:method ((frame document-frame))
+    nil)
+  (:documentation "Get a scheme area with simulation model (the one
+which can be rotated and looks like a finished product) if there is
+such area."))
+
 (defun redraw-scheme-areas (document-frame)
   (mapc #'gtk-widget-queue-draw
         (frame-scheme-areas document-frame)))
@@ -97,7 +104,36 @@ frame types."))
     ;; Add frame box to the frame
     (gtk-container-add frame frame-box)))
 
+(defmethod simulation-area ((frame rope-frame))
+  (third (frame-scheme-areas frame)))
+
 (defmethod make-document-frame ((document document-rope) &key pathname)
   (make-instance 'rope-frame
+                 :document document
+                 :pathname pathname))
+
+;; RING-FRAME
+(defclass ring-frame (document-frame)
+  ()
+  (:metaclass gobject-class)
+  (:documentation "Document frame for a ring in mosaic technique"))
+
+(defmethod initialize-instance :after ((frame ring-frame) &rest initargs)
+  (declare (ignore initargs))
+  (let ((document (frame-document frame)))
+    (setf (frame-scheme-areas frame)
+          (list (make-instance 'scheme-area
+                               ;; FIXME: What?
+                               :width-request 1200
+                               :valign        :fill
+                               :vexpand       t
+                               :model         (make-instance 'ring-model :document document))))
+
+    ;; Add widgets to the frame box
+    ;; The drawing area
+    (gtk-container-add frame (first (frame-scheme-areas frame)))))
+
+(defmethod make-document-frame ((document document-ring) &key pathname)
+  (make-instance 'ring-frame
                  :document document
                  :pathname pathname))

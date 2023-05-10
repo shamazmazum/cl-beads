@@ -187,7 +187,7 @@ the document."
                         *default-rope-width*))
   (:documentation "A document for a beaded crochet rope"))
 
-(defparameter *default-ring-width* 100
+(defparameter *default-ring-width* 30
   "Initial width of a scheme (ring).")
 
 (defparameter *default-ring-height* 6
