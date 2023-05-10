@@ -13,6 +13,21 @@
   (:documentation "Class for main window in cl-beads app"))
 
 ;; Widget helpers
+(defun add-file-filters (dialog)
+  (let ((filter (make-instance 'gtk-file-filter)))
+    (gtk-file-filter-add-pattern filter "*.jbb")
+    (gtk-file-filter-add-pattern filter "*.clb")
+    (gtk-file-filter-set-name    filter "All supported formats")
+    (gtk-file-chooser-add-filter dialog filter))
+  (let ((filter (make-instance 'gtk-file-filter)))
+    (gtk-file-filter-add-pattern filter "*.jbb")
+    (gtk-file-filter-set-name    filter "JBead file")
+    (gtk-file-chooser-add-filter dialog filter))
+  (let ((filter (make-instance 'gtk-file-filter)))
+    (gtk-file-filter-add-pattern filter "*.clb")
+    (gtk-file-filter-set-name    filter "cl-beads file")
+    (gtk-file-chooser-add-filter dialog filter)))
+
 (defun make-spin-button (adjustment)
   "Make a spin button for dialogs"
   (make-instance 'gtk-spin-button
@@ -68,15 +83,13 @@ document and its pathname."
                  "Open Document"
                  parent :open
                  "gtk-cancel" :cancel
-                 "gtk-open"   :ok))
-        (filter (make-instance 'gtk-file-filter)))
-    (gtk-file-filter-add-pattern filter "*.jbb")
-    (gtk-file-filter-set-name    filter "JBead file")
-    (gtk-file-chooser-add-filter dialog filter)
+                 "gtk-open"   :ok)))
+    (add-file-filters dialog)
     (unwind-protect
         (when (eq (gtk-dialog-run dialog) :ok)
           (let ((pathname (gtk-file-chooser-get-filename dialog)))
-            (values (read-jbb pathname) pathname)))
+            (values (read-document pathname (guess-format pathname))
+                    pathname)))
       (gtk-widget-destroy dialog))))
 
 (defun save-dialog (parent)
@@ -86,20 +99,19 @@ document and its pathname."
                  parent :save
                  "gtk-cancel" :cancel
                  "gtk-save"   :ok))
-        (filter (make-instance 'gtk-file-filter))
         (frame (window-document-frame parent)))
+    (add-file-filters dialog)
     (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
     (let ((pathname (frame-pathname frame)))
       (if pathname
           (gtk-file-chooser-set-filename dialog pathname)
           (gtk-file-chooser-set-current-name dialog "Untitled.jbb")))
-    (gtk-file-filter-add-pattern filter "*.jbb")
-    (gtk-file-filter-set-name    filter "JBead file")
-    (gtk-file-chooser-add-filter dialog filter)
     (unwind-protect
         (when (eq (gtk-dialog-run dialog) :ok)
           (let ((filename (gtk-file-chooser-get-filename dialog)))
-            (write-jbb (frame-document frame) filename)
+            (write-document (frame-document frame)
+                            filename
+                            (guess-format filename))
             filename))
       (gtk-widget-destroy dialog))))
 
@@ -206,7 +218,7 @@ width and height of a scheme."
         (when document
           (set-window-title
            (open-document document (window-callback parent) :pathname pathname))))
-    (invalid-file (c)
+    ((or invalid-file wrong-format) (c)
       (error-dialog parent "Cannot open a file" c)
       ())))
 
@@ -227,11 +239,12 @@ width and height of a scheme."
       (set-window-title parent))))
 
 (defun save-handler (parent widget)
-  (let ((frame (window-document-frame parent)))
+  (let* ((frame (window-document-frame parent))
+         (pathname (frame-pathname frame)))
     (cond
-      ((frame-pathname frame)
-       (write-jbb (frame-document frame)
-                  (frame-pathname frame))
+      (pathname
+       (write-document (frame-document frame) pathname
+                       (guess-format pathname))
        (setf (frame-dirty-state-p frame) nil))
       (t
        (save-as-handler parent widget)))))
@@ -241,7 +254,7 @@ width and height of a scheme."
   (lambda (parent widget)
     (handler-case
         (funcall handler parent widget)
-      (output-error (c)
+      ((or output-error wrong-format) (c)
         (error-dialog parent "Save error" c)))))
 
 ;; Main stuff
