@@ -1,5 +1,7 @@
 (in-package :cl-beads)
 
+(deftype orientation () '(member :horizontal :vertical))
+
 (defclass document-frame (gtk-frame)
   ((document      :initarg  :document
                   :initform (error ":document must be specified")
@@ -31,6 +33,10 @@ frame types."))
   (:documentation "Get a scheme area with simulation model (the one
 which can be rotated and looks like a finished product) if there is
 such area."))
+
+(defgeneric preferred-orientation (frame)
+  (:documentation "Preferred orientation of the frame.
+Either :HORIZONTAL or :VERTICAL."))
 
 (defun redraw-scheme-areas (document-frame)
   (mapc #'gtk-widget-queue-draw
@@ -112,6 +118,9 @@ such area."))
                  :document document
                  :pathname pathname))
 
+(defmethod preferred-orientation ((frame rope-frame))
+  :vertical)
+
 ;; RING-FRAME
 (defclass ring-frame (document-frame)
   ()
@@ -123,11 +132,12 @@ such area."))
   (let ((document (frame-document frame)))
     (setf (frame-scheme-areas frame)
           (list (make-instance 'scheme-area
-                               ;; FIXME: What?
-                               :width-request 1200
-                               :valign        :fill
-                               :vexpand       t
-                               :model         (make-instance 'ring-model :document document))))
+                               ;; FIXME: Must not specify this by hand
+                               :outline-width  1d-3
+                               :height-request 400
+                               :halign         :fill
+                               :hexpand        t
+                               :model          (make-instance 'ring-model :document document))))
 
     ;; Add widgets to the frame box
     ;; The drawing area
@@ -137,3 +147,13 @@ such area."))
   (make-instance 'ring-frame
                  :document document
                  :pathname pathname))
+
+(defmethod preferred-orientation ((frame ring-frame))
+  :horizontal)
+
+(sera:-> make-preferred-box (orientation)
+         (values gtk-box &optional))
+(defun make-preferred-box (orientation)
+  (ecase orientation
+    (:vertical   (make-instance 'gtk-hbox))
+    (:horizontal (make-instance 'gtk-vbox))))

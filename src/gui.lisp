@@ -286,21 +286,20 @@ There is no undo operation yet. Do not forget to save your document before cloni
 the document (if exists, i.e. the document is not a new
 document). WINDOW-CALLBACK is a callback which is called when the
 document's window is created or destroyed."
-  (let* ((menu-bar       (make-instance 'gtk-menu-bar))
-         ;; TODO: some document frames may prefer vbox
-         (workspace-box  (make-instance 'gtk-hbox))
-         (toolbar-box    (make-instance 'gtk-hbox))
-         (main-box       (make-instance 'gtk-vbox))
-         (current-color  (make-instance 'palette-button :sensitive nil))
-         (document-frame (make-document-frame document :pathname pathname))
+  (let* ((document-frame (make-document-frame document :pathname pathname))
          (window (make-instance 'document-window
                                 :title          "cl-beads"
                                 :callback       window-callback
                                 :document-frame document-frame
                                 :default-width  600
-                                :default-height 800)))
+                                :default-height 800))
+         (menu-bar       (make-instance 'gtk-menu-bar))
+         (workspace-box  (make-preferred-box (preferred-orientation document-frame)))
+         (toolbar-box    (make-instance 'gtk-hbox))
+         (main-box       (make-instance 'gtk-vbox))
+         (current-color  (make-instance 'palette-button :sensitive nil)))
 
-        ;; Handle click on a bead
+    ;; Handle click on a bead
     (dolist (area (frame-scheme-areas document-frame))
       (g-signal-connect
        area "my-bead-clicked"
