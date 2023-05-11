@@ -47,10 +47,10 @@
         format
         (error 'wrong-format :pathname pathname))))
 
-(defgeneric %read-document (pathname format)
+(defgeneric read-document (pathname format)
   (:documentation "Read a document from a file with path PATHNAME of format FORMAT"))
 
-(defmethod %read-document :around (pathname format)
+(defmethod read-document :around (pathname format)
   (declare (ignore format))
     (handler-case
       (call-next-method)
@@ -61,16 +61,10 @@
              :description (with-output-to-string (out)
                             (princ c out))))))
 
-;; Type-annotated version
-(sera:-> read-document ((or pathname string) file-format)
-         (values document &optional))
-(defun read-document (pathname format)
-  (%read-document pathname format))
-
-(defgeneric %write-document (document pathname format)
+(defgeneric write-document (document pathname format)
   (:documentation "Write a document to a file with path PATHNAME of format FORMAT"))
 
-(defmethod %write-document :around ((document document) pathname format)
+(defmethod write-document :around ((document document) pathname format)
   (declare (ignore format))
   (handler-case
       (call-next-method)
@@ -81,12 +75,6 @@
              :description (with-output-to-string (out)
                             (princ c out))))))
 
-(defmethod %write-document ((document document) pathname format)
+(defmethod write-document ((document document) pathname format)
   (declare (ignore format))
   (error 'wrong-format :pathname pathname))
-
-;; Type-annotated version
-(sera:-> write-document (document (or pathname string) file-format)
-         (values document &optional))
-(defun write-document (document pathname format)
-  (%write-document document pathname format))

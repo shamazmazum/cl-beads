@@ -5,7 +5,7 @@
 (defun parse-clb-color (color)
   (apply #'color (cdr color)))
 
-(defmethod %read-document (pathname (format (eql :clb)))
+(defmethod read-document (pathname (format (eql :clb)))
   (let ((content (uiop:safe-read-file-form
                   pathname :package :clb-sym)))
     (unless (and (listp content)
@@ -45,7 +45,7 @@
                      :element-type 'unsigned-byte
                      :initial-contents model))))))
 
-(defmethod %write-document ((document document) pathname (format (eql :clb)))
+(defmethod write-document ((document document) pathname (format (eql :clb)))
   (let ((form `(clb-sym::clb
                 (clb-sym::version . 1)
                 (clb-sym::author       . ,(document-author       document))

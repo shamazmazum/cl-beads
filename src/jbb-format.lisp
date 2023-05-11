@@ -9,7 +9,7 @@
            (/ g 255d0)
            (/ b 255d0))))
 
-(defmethod %read-document (pathname (format (eql :jbb)))
+(defmethod read-document (pathname (format (eql :jbb)))
   (let ((content (uiop:safe-read-file-form
                   pathname :package :clb-sym)))
     (unless (and (listp content)
@@ -44,7 +44,7 @@
                                    :element-type 'unsigned-byte
                                    :initial-contents model))))))
 
-(defmethod %write-document ((document document-rope) pathname (format (eql :jbb)))
+(defmethod write-document ((document document-rope) pathname (format (eql :jbb)))
   (let ((form `(clb-sym::jbb
                 (clb-sym::version 1)
                 (clb-sym::author       ,(document-author       document))
