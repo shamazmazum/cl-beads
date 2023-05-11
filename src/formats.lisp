@@ -37,6 +37,18 @@
 
 (deftype file-format () '(member :jbb :clb))
 
+(sera:-> format->file-type (file-format)
+         (values string &optional))
+(defun format->file-type (format)
+  "Transform format to a file type"
+  (string-downcase (symbol-name format)))
+
+(sera:-> format->filter (file-format)
+         (values string &optional))
+(defun format->filter (format)
+  "Transform format to a gtk file filter"
+  (format nil "*.~a" (format->file-type format)))
+
 (sera:-> guess-format ((or string pathname))
          (values file-format &optional))
 (defun guess-format (pathname)
@@ -47,9 +59,32 @@
         format
         (error 'wrong-format :pathname pathname))))
 
+
+(defclass saveable () ()
+  (:documentation "A generic class for a saveable document"))
+
+(defclass jbb-format-mixin (saveable) ()
+  (:documentation "A mixin class for documents which can be saved in JBead format"))
+
+(defclass clb-format-mixin (saveable) ()
+  (:documentation "A mixin class for documents which can be saved in cl-beads format"))
+
+(defclass universal-document (jbb-format-mixin clb-format-mixin)
+  ()
+  (:documentation "Pseudo-document class which supports saving in every format."))
+
+;; Interface
 (defgeneric read-document (pathname format)
   (:documentation "Read a document from a file with path PATHNAME of format FORMAT"))
 
+(defgeneric write-document (document pathname format)
+  (:documentation "Write a document to a file with path PATHNAME of format FORMAT"))
+
+(defgeneric supported-formats (document)
+  (:documentation "Return a list of formats in which this document can be saved")
+  (:method-combination append))
+
+;; Methods
 (defmethod read-document :around (pathname format)
   (declare (ignore format))
     (handler-case
@@ -61,10 +96,7 @@
              :description (with-output-to-string (out)
                             (princ c out))))))
 
-(defgeneric write-document (document pathname format)
-  (:documentation "Write a document to a file with path PATHNAME of format FORMAT"))
-
-(defmethod write-document :around ((document document) pathname format)
+(defmethod write-document :around ((document saveable) pathname format)
   (declare (ignore format))
   (handler-case
       (call-next-method)
@@ -75,6 +107,6 @@
              :description (with-output-to-string (out)
                             (princ c out))))))
 
-(defmethod write-document ((document document) pathname format)
+(defmethod write-document ((document saveable) pathname format)
   (declare (ignore format))
   (error 'wrong-format :pathname pathname))

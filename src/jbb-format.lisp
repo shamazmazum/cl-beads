@@ -44,7 +44,7 @@
                                    :element-type 'unsigned-byte
                                    :initial-contents model))))))
 
-(defmethod write-document ((document document-rope) pathname (format (eql :jbb)))
+(defmethod write-document ((document jbb-format-mixin) pathname (format (eql :jbb)))
   (let ((form `(clb-sym::jbb
                 (clb-sym::version 1)
                 (clb-sym::author       ,(document-author       document))
@@ -95,3 +95,6 @@
                :stream output
                :case   :downcase))))
     document)
+
+(defmethod supported-formats append ((document jbb-format-mixin))
+  '((:jbb . "JBead format")))

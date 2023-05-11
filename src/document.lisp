@@ -189,7 +189,7 @@ the document."
 (defparameter *default-rope-height* 200
   "Initial height of a scheme (beaded rope).")
 
-(defclass document-rope (document)
+(defclass document-rope (document jbb-format-mixin clb-format-mixin)
   ()
   (:default-initargs
    :scheme (make-scheme *default-rope-height*
@@ -205,7 +205,7 @@ the document."
 (defparameter *default-ring-height* 6
   "Initial height of a scheme (ring).")
 
-(defclass document-ring (document)
+(defclass document-ring (document clb-format-mixin)
   ()
   (:default-initargs
    :scheme (make-scheme *default-ring-height*

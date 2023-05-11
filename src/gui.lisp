@@ -13,20 +13,20 @@
   (:documentation "Class for main window in cl-beads app"))
 
 ;; Widget helpers
-(defun add-file-filters (dialog)
-  (let ((filter (make-instance 'gtk-file-filter)))
-    (gtk-file-filter-add-pattern filter "*.jbb")
-    (gtk-file-filter-add-pattern filter "*.clb")
-    (gtk-file-filter-set-name    filter "All supported formats")
-    (gtk-file-chooser-add-filter dialog filter))
-  (let ((filter (make-instance 'gtk-file-filter)))
-    (gtk-file-filter-add-pattern filter "*.jbb")
-    (gtk-file-filter-set-name    filter "JBead file")
-    (gtk-file-chooser-add-filter dialog filter))
-  (let ((filter (make-instance 'gtk-file-filter)))
-    (gtk-file-filter-add-pattern filter "*.clb")
-    (gtk-file-filter-set-name    filter "cl-beads file")
-    (gtk-file-chooser-add-filter dialog filter)))
+(defun add-file-filters (dialog &optional (document (make-instance 'universal-document)))
+  (let ((supported-formats (supported-formats document)))
+    (dolist (format supported-formats)
+      (let ((filter (make-instance 'gtk-file-filter)))
+        (destructuring-bind (format . description) format
+          (gtk-file-filter-add-pattern filter (format->filter format))
+          (gtk-file-filter-set-name    filter description))
+        (gtk-file-chooser-add-filter dialog filter)))
+    (when (> (length supported-formats) 1)
+      (let ((filter (make-instance 'gtk-file-filter)))
+        (dolist (format supported-formats)
+          (gtk-file-filter-add-pattern filter (format->filter (car format))))
+        (gtk-file-filter-set-name filter "All supported formats")
+        (gtk-file-chooser-add-filter dialog filter)))))
 
 (defun make-spin-button (adjustment)
   "Make a spin button for dialogs"
@@ -94,25 +94,29 @@ document and its pathname."
 
 (defun save-dialog (parent)
   "Run 'Save Document' dialog and maybe save the document."
-  (let ((dialog (gtk-file-chooser-dialog-new
-                 "Save Document"
-                 parent :save
-                 "gtk-cancel" :cancel
-                 "gtk-save"   :ok))
-        (frame (window-document-frame parent)))
-    (add-file-filters dialog)
+  (let* ((dialog (gtk-file-chooser-dialog-new
+                  "Save Document"
+                  parent :save
+                  "gtk-cancel" :cancel
+                  "gtk-save"   :ok))
+         (frame (window-document-frame parent))
+         (document (frame-document frame)))
+    (add-file-filters dialog document)
     (gtk-file-chooser-set-do-overwrite-confirmation dialog t)
     (let ((pathname (frame-pathname frame)))
       (if pathname
           (gtk-file-chooser-set-filename dialog pathname)
-          (gtk-file-chooser-set-current-name dialog "Untitled.jbb")))
+          (gtk-file-chooser-set-current-name
+           dialog
+           (namestring
+            (make-pathname :name "Untitled"
+                           :type (format->file-type
+                                  (caar (supported-formats document))))))))
     (unwind-protect
-        (when (eq (gtk-dialog-run dialog) :ok)
-          (let ((filename (gtk-file-chooser-get-filename dialog)))
-            (write-document (frame-document frame)
-                            filename
-                            (guess-format filename))
-            filename))
+         (when (eq (gtk-dialog-run dialog) :ok)
+           (let ((filename (gtk-file-chooser-get-filename dialog)))
+             (write-document document filename (guess-format filename))
+             filename))
       (gtk-widget-destroy dialog))))
 
 (defun adjustments-for-scheme-dimensions (document)

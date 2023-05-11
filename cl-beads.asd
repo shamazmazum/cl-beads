@@ -8,8 +8,8 @@
   :pathname "src"
   :components ((:file "package")
                (:file "icons")
-               (:file "document")
                (:file "formats")
+               (:file "document")
                (:file "jbb-format")
                (:file "clb-format")
                (:file "model")

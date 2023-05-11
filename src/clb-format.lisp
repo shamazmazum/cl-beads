@@ -45,7 +45,7 @@
                      :element-type 'unsigned-byte
                      :initial-contents model))))))
 
-(defmethod write-document ((document document) pathname (format (eql :clb)))
+(defmethod write-document ((document clb-format-mixin) pathname (format (eql :clb)))
   (let ((form `(clb-sym::clb
                 (clb-sym::version . 1)
                 (clb-sym::author       . ,(document-author       document))
@@ -80,3 +80,6 @@
       (let ((*package* (find-package :clb-sym)))
         (write form :stream output))))
     document)
+
+(defmethod supported-formats append ((document clb-format-mixin))
+  '((:clb . "cl-beads format")))
