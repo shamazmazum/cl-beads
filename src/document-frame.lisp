@@ -66,12 +66,17 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
           (list (make-instance (closer-mop:ensure-class
                                 'scheme-area-with-ruler
                                 :metaclass 'gobject-class
-                                :direct-superclasses (mapcar #'find-class '(scheme-area ruler-mixin)))
+                                :direct-superclasses (mapcar #'find-class
+                                                             '(scheme-area ruler-mixin)))
                                :width-request 200
                                :valign        :fill
                                :vexpand       t
                                :model         (make-instance 'draft-model :document document))
-                (make-instance 'scheme-area
+                (make-instance (closer-mop:ensure-class
+                                'scheme-area-with-reader-line
+                                :metaclass 'gobject-class
+                                :direct-superclasses (mapcar #'find-class
+                                                             '(scheme-area reader-line-mixin)))
                                :width-request 200
                                :valign        :fill
                                :vexpand       t

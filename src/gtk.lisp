@@ -78,6 +78,10 @@
 ;; Cairo
 (in-package :cairo)
 
+(defcfun ("cairo_identity_matrix" cairo-identity-matrix) :void
+  (cr (:pointer (:struct cairo-t))))
+(export 'cairo-identity-matrix)
+
 (defun fill-foreign-matrix (matrix ptr)
   ;; More elegant way to do this?!
   (setf (foreign-slot-value ptr '(:struct cairo-matrix-t) 'xx)
@@ -163,3 +167,17 @@
        (convert-from-foreign m-ptr '(:struct cairo-matrix-t))
        status))))
 (export 'cairo-matrix-invert)
+
+(defpackage gtk-fixed
+  (:use #:cl)
+  (:local-nicknames (:sera :serapeum))
+  (:export #:gtk-render-focus))
+(in-package :gtk-fixed)
+
+(defun gtk-render-focus (context cr x y width height)
+  (gtk:gtk-render-focus
+   context cr
+   (float x 0d0)
+   (float y 0d0)
+   (float width 0d0)
+   (float height 0d0)))
