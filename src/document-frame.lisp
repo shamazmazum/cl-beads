@@ -191,9 +191,15 @@ There is no undo operation yet. Do not forget to save your document before cloni
     (setf (scheme-area-show-markings-p draft-area) nil)
     (gtk-widget-queue-draw draft-area)))
 
+(defun set-focus-on-corrected-area (parent frame)
+  (declare (ignore parent))
+  (gtk-widget-grab-focus
+   (second (frame-scheme-areas frame))))
+
 (defmethod additional-edit-tools append ((frame rope-frame))
   (list
-   (cons "_Clone rows" #'clone-rows)))
+   (cons "_Clone rows" #'clone-rows)
+   (cons "Set _focus on the scheme" #'set-focus-on-corrected-area)))
 
 ;; RING-FRAME
 (defclass ring-frame (document-frame)

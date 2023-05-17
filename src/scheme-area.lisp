@@ -312,8 +312,7 @@ CTX."
 
 (defmethod initialize-instance :after ((widget reader-line-mixin) &rest initargs)
   (declare (ignore initargs))
-  ;; FIXME: Focus on click does not work for some reason
-  (setf (gtk-widget-focus-on-click widget) t
+  (setf (gtk-widget-focus-on-click widget) nil
         (gtk-widget-can-focus      widget) t)
   (g-signal-connect widget "key-press-event" #'key-pressed)
   (gtk-widget-add-events widget '(:key-press-mask)))
