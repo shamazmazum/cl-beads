@@ -253,10 +253,14 @@ CTX."
 ;; Reader line
 
 (defclass reader-line-mixin (gtk-widget)
-  ((line-position   :initform 0
-                    :initarg  :line-position
-                    :type     unsigned-byte
-                    :accessor scheme-area-line-position))
+  ((line-position :initform 0
+                  :initarg  :line-position
+                  :type     unsigned-byte
+                  :accessor scheme-area-line-position)
+   (show-line-p   :initform nil
+                  :initarg  :show-line-p
+                  :type     boolean
+                  :accessor scheme-area-show-reader-line-p))
   (:metaclass gobject-class)
   (:documentation "A reading line for scheme-area object"))
 
@@ -283,15 +287,17 @@ CTX."
        (gdk-rectangle-height allocation))
       (cairo-restore ctx))
 
-    (cairo-set-source-rgb
-     ctx
-     (color-r color)
-     (color-g color)
-     (color-b color))
-    (cairo-set-line-width ctx (* 0.75 (scheme-area-outline-width widget)))
-    (cairo-move-to ctx 0 position)
-    (cairo-line-to ctx 1 position)
-    (cairo-stroke ctx))
+    (when (scheme-area-show-reader-line-p widget)
+      (cairo-set-source-rgba
+       ctx
+       (color-r color)
+       (color-g color)
+       (color-b color)
+       5d-1)
+      (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
+      (cairo-move-to ctx 0 position)
+      (cairo-line-to ctx 1 position)
+      (cairo-stroke ctx)))
   nil)
 
 (defun key-pressed (widget event)

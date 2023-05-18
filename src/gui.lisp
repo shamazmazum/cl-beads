@@ -42,15 +42,17 @@
          :image (gtk-image-new-from-icon-name stock-id :large-toolbar)
          args))
 
-(defun make-menu-entry (label &rest args &key (stockp t) &allow-other-keys)
+(defun make-menu-entry (label &rest args
+                        &key (stockp t) (checkboxp nil) &allow-other-keys)
   "Make a menu entry, maybe with stock label"
-  (let ((args (alex:remove-from-plist args :stockp)))
-    (apply
-     #'make-instance 'gtk-image-menu-item
-     :label         label
-     :use-underline t
-     :use-stock     stockp
-     args)))
+   (apply
+    ;; FIXME: check-menu-item cannot use stock labels,
+    ;; gtk-image-menu-item is deprecated
+    #'make-instance (if checkboxp 'gtk-check-menu-item 'gtk-image-menu-item)
+    :label         label
+    :use-underline t
+    :use-stock     stockp
+    (alex:remove-from-plist args :stockp :checkboxp)))
 
 (defun set-window-title (window)
   "Set window title according to the loaded document."
@@ -539,35 +541,46 @@ document's window is created or destroyed."
                                     :use-underline t))
           (submenu (make-instance 'gtk-menu))
           (item-edit-undo  (make-menu-entry "gtk-undo" :sensitive nil))
-          (item-edit-redo  (make-menu-entry "gtk-redo" :sensitive nil))
-          (additional-items (additional-edit-tools document-frame)))
+          (item-edit-redo  (make-menu-entry "gtk-redo" :sensitive nil)))
       (gtk-menu-shell-append submenu item-edit-undo)
       (gtk-menu-shell-append submenu item-edit-redo)
-      (dolist (item additional-items)
-        (let ((menu-entry (make-menu-entry (car item) :stockp nil)))
-          (gtk-menu-shell-append submenu menu-entry)
-          (g-signal-connect
-           menu-entry "activate"
-           (lambda (widget)
-             (declare (ignore widget))
-             (funcall (cdr item) window document-frame)))))
       (setf (gtk-menu-item-submenu item-edit) submenu)
       (gtk-menu-shell-append menu-bar item-edit))
 
-    ;; Setting menu
+    ;; Tools menu
+    (alex:when-let ((additional-items (additional-tools document-frame)))
+      (let ((item-tools (make-instance 'gtk-menu-item
+                                       :label "_Tools"
+                                       :use-underline t))
+            (submenu (make-instance 'gtk-menu)))
+        (dolist (item additional-items)
+          (let ((menu-entry (make-menu-entry (menu-item-label item)
+                                             :stockp    nil
+                                             :checkboxp (menu-item-checkbox-p item))))
+            (gtk-menu-shell-append submenu menu-entry)
+            (g-signal-connect
+             menu-entry "activate"
+             (lambda (widget)
+               (declare (ignore widget))
+               (apply #'funcall (menu-item-callback item)
+                      window document-frame
+                      (if (menu-item-checkbox-p item)
+                          (list (gtk-check-menu-item-active menu-entry))))))))
+        (setf (gtk-menu-item-submenu item-tools) submenu)
+        (gtk-menu-shell-append menu-bar item-tools)))
+
+    ;; Settings menu
     (let ((item-settings (make-instance 'gtk-menu-item
                                         :label "_Settings"
                                         :use-underline t))
           (submenu (make-instance 'gtk-menu))
           (item-settings-pref (make-menu-entry "gtk-preferences")))
-
       (g-signal-connect
        item-settings-pref "activate"
        (lambda (widget)
          (declare (ignore widget))
          (when (settings-dialog window)
            (redraw-scheme-areas document-frame))))
-
       (gtk-menu-shell-append submenu item-settings-pref)
       (setf (gtk-menu-item-submenu item-settings) submenu)
       (gtk-menu-shell-append menu-bar item-settings))

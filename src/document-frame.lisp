@@ -2,6 +2,12 @@
 
 (deftype orientation () '(member :horizontal :vertical))
 
+;; FIXME: Invent a consistency mechanism for the checkbutton
+(sera:defconstructor menu-item
+  (label      string)
+  (checkbox-p boolean)
+  (callback   function))
+
 (defclass document-frame (gtk-frame)
   ((document      :initarg  :document
                   :initform (error ":document must be specified")
@@ -38,7 +44,7 @@ such area."))
   (:documentation "Preferred orientation of the frame.
 Either :HORIZONTAL or :VERTICAL."))
 
-(defgeneric additional-edit-tools (frame)
+(defgeneric additional-tools (frame)
   (:documentation "A list of additional edit tools which are specific
 to this document frame and added to the Edit menu.
 
@@ -49,7 +55,7 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
   (mapc #'gtk-widget-queue-draw
         (frame-scheme-areas document-frame)))
 
-(defmethod additional-edit-tools append ((frame document-frame))
+(defmethod additional-tools append ((frame document-frame))
   nil)
 
 ;; ROPE-FRAME
@@ -196,10 +202,17 @@ There is no undo operation yet. Do not forget to save your document before cloni
   (gtk-widget-grab-focus
    (second (frame-scheme-areas frame))))
 
-(defmethod additional-edit-tools append ((frame rope-frame))
+(defun toggle-reader-line (parent frame active)
+  (declare (ignore parent))
+  (let ((corrected-area (second (frame-scheme-areas frame))))
+    (setf (scheme-area-show-reader-line-p corrected-area) active)
+    (gtk-widget-queue-draw corrected-area)))
+
+(defmethod additional-tools append ((frame rope-frame))
   (list
-   (cons "_Clone rows" #'clone-rows)
-   (cons "Set _focus on the scheme" #'set-focus-on-corrected-area)))
+   (menu-item "_Clone rows" nil #'clone-rows)
+   (menu-item "_Reader line" t #'toggle-reader-line)
+   (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area)))
 
 ;; RING-FRAME
 (defclass ring-frame (document-frame)
