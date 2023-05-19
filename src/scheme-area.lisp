@@ -252,7 +252,7 @@ CTX."
 
 ;; Reader line
 
-(defclass reader-line-mixin (gtk-widget)
+(defclass reading-line-mixin (gtk-widget)
   ((line-position :initform 0
                   :initarg  :line-position
                   :type     unsigned-byte
@@ -260,12 +260,12 @@ CTX."
    (show-line-p   :initform nil
                   :initarg  :show-line-p
                   :type     boolean
-                  :accessor scheme-area-show-reader-line-p))
+                  :accessor scheme-area-show-reading-line-p))
   (:metaclass gobject-class)
   (:documentation "A reading line for scheme-area object"))
 
 ;; Preferably must be called last for proper color mixing
-(defmethod draw-scheme progn ((widget reader-line-mixin) ctx)
+(defmethod draw-scheme progn ((widget reading-line-mixin) ctx)
   (let* ((ctx (pointer ctx))
          (allocation (gtk-widget-get-allocation widget))
          (model (scheme-area-model widget))
@@ -287,7 +287,7 @@ CTX."
        (gdk-rectangle-height allocation))
       (cairo-restore ctx))
 
-    (when (scheme-area-show-reader-line-p widget)
+    (when (scheme-area-show-reading-line-p widget)
       (cairo-set-source-rgba
        ctx
        (color-r color)
@@ -301,7 +301,7 @@ CTX."
   nil)
 
 (defun key-pressed (widget event)
-  (when (scheme-area-show-reader-line-p widget)
+  (when (scheme-area-show-reading-line-p widget)
     (let ((document (scheme-model-document
                      (scheme-area-model widget))))
       (with-accessors ((position scheme-area-line-position))
@@ -318,7 +318,7 @@ CTX."
     ;; shown
     t))
 
-(defmethod initialize-instance :after ((widget reader-line-mixin) &rest initargs)
+(defmethod initialize-instance :after ((widget reading-line-mixin) &rest initargs)
   (declare (ignore initargs))
   (setf (gtk-widget-focus-on-click widget) nil
         (gtk-widget-can-focus      widget) t)

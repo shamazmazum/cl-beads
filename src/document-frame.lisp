@@ -79,10 +79,10 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
                                :vexpand       t
                                :model         (make-instance 'draft-model :document document))
                 (make-instance (closer-mop:ensure-class
-                                'scheme-area-with-reader-line
+                                'scheme-area-with-reading-line
                                 :metaclass 'gobject-class
                                 :direct-superclasses (mapcar #'find-class
-                                                             '(scheme-area reader-line-mixin)))
+                                                             '(scheme-area reading-line-mixin)))
                                :width-request 200
                                :valign        :fill
                                :vexpand       t
@@ -202,16 +202,16 @@ There is no undo operation yet. Do not forget to save your document before cloni
   (gtk-widget-grab-focus
    (second (frame-scheme-areas frame))))
 
-(defun toggle-reader-line (parent frame active)
+(defun toggle-reading-line (parent frame active)
   (declare (ignore parent))
   (let ((corrected-area (second (frame-scheme-areas frame))))
-    (setf (scheme-area-show-reader-line-p corrected-area) active)
+    (setf (scheme-area-show-reading-line-p corrected-area) active)
     (gtk-widget-queue-draw corrected-area)))
 
 (defmethod additional-tools append ((frame rope-frame))
   (list
    (menu-item "_Clone rows" nil #'clone-rows)
-   (menu-item "_Reader line" t #'toggle-reader-line)
+   (menu-item "_Reading line" t #'toggle-reading-line)
    (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area)))
 
 ;; RING-FRAME
