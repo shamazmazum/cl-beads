@@ -301,20 +301,22 @@ CTX."
   nil)
 
 (defun key-pressed (widget event)
-  (let ((document (scheme-model-document
-                   (scheme-area-model widget))))
-    (with-accessors ((position scheme-area-line-position))
-        widget
-      (case (gdk-event-key-keyval event)
-        (#xff52
-         (setf position (min (1+ position)
-                             (document-height document)))
-         (gtk-widget-queue-draw widget))
-        (#xff54
-         (setf position (max (1- position) 0))
-         (gtk-widget-queue-draw widget)))))
-  ;; Prevent focus from leaving the area
-  t)
+  (when (scheme-area-show-reader-line-p widget)
+    (let ((document (scheme-model-document
+                     (scheme-area-model widget))))
+      (with-accessors ((position scheme-area-line-position))
+          widget
+        (case (gdk-event-key-keyval event)
+          (#xff52
+           (setf position (min (1+ position)
+                               (document-height document)))
+           (gtk-widget-queue-draw widget))
+          (#xff54
+           (setf position (max (1- position) 0))
+           (gtk-widget-queue-draw widget)))))
+    ;; Prevent focus from leaving the area if the line is currently
+    ;; shown
+    t))
 
 (defmethod initialize-instance :after ((widget reader-line-mixin) &rest initargs)
   (declare (ignore initargs))
