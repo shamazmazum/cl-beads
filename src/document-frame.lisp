@@ -33,13 +33,6 @@
 to edit the document. Different document types may result in different
 frame types."))
 
-(defgeneric simulation-area (frame)
-  (:method ((frame document-frame))
-    nil)
-  (:documentation "Get a scheme area with simulation model (the one
-which can be rotated and looks like a finished product) if there is
-such area."))
-
 (defgeneric preferred-orientation (frame)
   (:documentation "Preferred orientation of the frame.
 Either :HORIZONTAL or :VERTICAL."))
@@ -54,6 +47,15 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
 (defun redraw-scheme-areas (document-frame)
   (mapc #'gtk-widget-queue-draw
         (frame-scheme-areas document-frame)))
+
+(defun simulation-area (frame)
+  "Get a scheme area with simulation model (the one which can be
+rotated and looks like a finished product) if there is such area."
+  (find-if
+   (alex:compose
+    (alex:rcurry #'typep 'rotatable-scheme-model)
+    #'scheme-area-model)
+   (frame-scheme-areas frame)))
 
 (defmethod additional-tools append ((frame document-frame))
   nil)
@@ -130,9 +132,6 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
 
     ;; Add frame box to the frame
     (gtk-container-add frame frame-box)))
-
-(defmethod simulation-area ((frame rope-frame))
-  (third (frame-scheme-areas frame)))
 
 (defmethod make-document-frame ((document document-rope) &key pathname)
   (make-instance 'rope-frame
@@ -251,9 +250,6 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defmethod preferred-orientation ((frame ring-frame))
   :horizontal)
-
-(defmethod simulation-area ((frame ring-frame))
-  (second (frame-scheme-areas frame)))
 
 (sera:-> make-preferred-box (orientation)
          (values gtk-box &optional))
