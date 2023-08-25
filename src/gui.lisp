@@ -391,13 +391,13 @@ document's window is created or destroyed."
            rotate-left "clicked"
            (lambda (widget)
              (declare (ignore widget))
-             (decf (simulated-model-rotation simulation-model))
+             (decf (model-rotation simulation-model))
              (gtk-widget-queue-draw simulation-area)))
           (g-signal-connect
            rotate-right "clicked"
            (lambda (widget)
              (declare (ignore widget))
-             (incf (simulated-model-rotation simulation-model))
+             (incf (model-rotation simulation-model))
              (gtk-widget-queue-draw simulation-area)))))
 
       (gtk-box-pack-start tools-box pencil       :expand nil)

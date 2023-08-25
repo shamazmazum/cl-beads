@@ -37,10 +37,28 @@ as a square."))
 (defgeneric bead-size (model)
   (:documentation "Get size of a bead for this model in user coordinates."))
 
-(defmethod bead-size ((model scheme-model))
-  (let ((document (scheme-model-document model)))
-    (min *maximum-bead-size*
-         (float (/ (document-width document)) 0d0))))
+(defclass standard-bead-size-mixin ()
+  ((additional-beads :type          double-float
+                     :initform      0d0
+                     :initarg       :additional-beads
+                     :reader        additional-beads
+                     :documentation "Additional beads which are added
+to DOCUMENT-WIDTH while calculating bead size."))
+  (:documentation "A mixin to scheme-model which provides default BEAD-SIZE method"))
+
+(defclass rotatable-scheme-model (scheme-model)
+  ((rotation :initform      0
+             :initarg       :rotation
+             :type          integer
+             :accessor      model-rotation
+             :documentation "Amount of rotation (in number of beads)"))
+  (:documentation "Scheme model which can be rotated."))
+
+(defmethod bead-size ((model standard-bead-size-mixin))
+  (min *maximum-bead-size*
+       (/ (+ (additional-beads model)
+             (document-width
+              (scheme-model-document model))))))
 
 (defmethod estimate-height ((model scheme-model))
   (let ((document (scheme-model-document model)))
@@ -48,7 +66,7 @@ as a square."))
        (document-height document))))
 
 ;; Draft
-(defclass draft-model (scheme-model)
+(defclass draft-model (scheme-model standard-bead-size-mixin)
   ()
   (:documentation "A model where each row has the same number of beads."))
 
@@ -82,11 +100,16 @@ as a square."))
 (defmethod estimate-height ((model dummy-model))
   0d0)
 
+(defmethod bead-size ((model dummy-model))
+  0d0)
+
 ;; Corrected
-(defclass corrected-model (scheme-model)
+(defclass corrected-model (scheme-model standard-bead-size-mixin)
   ()
   (:documentation "This model represents what you must actually weave
-with a crochet (I suppose. I never used that technique.) or a needle."))
+with a crochet (I suppose. I never used that technique.) or a needle.")
+  (:default-initargs
+      :additional-beads 1d0))
 
 (defmethod beads-iterator ((model corrected-model))
   (let* ((document (scheme-model-document model))
@@ -112,17 +135,9 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
           idx)))
      (si:range 0 (array-total-size scheme)))))
 
-(defmethod bead-size ((model corrected-model))
-  (let ((document (scheme-model-document model)))
-    (min *maximum-bead-size*
-         (float (/ (1+ (document-width document))) 0d0))))
-
 ;; Simulated
-(defclass simulated-model (scheme-model)
-  ((rotation :initform 0
-             :initarg  :rotation
-             :type     integer
-             :accessor simulated-model-rotation))
+(defclass simulated-model (rotatable-scheme-model standard-bead-size-mixin)
+  ()
   (:documentation "This is what the result looks like."))
 
 (defmethod beads-iterator ((model simulated-model))
@@ -154,7 +169,7 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
           (alex:when-let
               ((rect
                 (multiple-value-bind (q r)
-                    (floor (+ (mod (simulated-model-rotation model) width) idx)
+                    (floor (+ (mod (model-rotation model) width) idx)
                            (1+ (* 2 width)))
                   (cond
                     ;; Even row, first bead's width is half the normal width
@@ -175,9 +190,11 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
         (si:range 0 (array-total-size scheme)))))))
 
 ;; Rings in mosaic technique
-(defclass ring-model (scheme-model)
+(defclass ring-model (scheme-model standard-bead-size-mixin)
   ()
-  (:documentation "A model for rings in mosaic technique"))
+  (:documentation "A model for rings in mosaic technique")
+  (:default-initargs
+      :additional-beads 5d-1))
 
 (defmethod beads-iterator ((model ring-model))
   (let* ((document (scheme-model-document model))
@@ -199,8 +216,3 @@ with a crochet (I suppose. I never used that technique.) or a needle."))
           (array-row-major-index scheme i j))))
      (si:product (si:range 0 height)
                  (si:range 0 width)))))
-
-(defmethod bead-size ((model ring-model))
-  (let ((document (scheme-model-document model)))
-    (min *maximum-bead-size*
-         (/ (+ 5d-1 (document-width document))))))
