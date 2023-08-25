@@ -51,14 +51,36 @@ Each tool is a cons `(name . (lambda (parent-window frame) ...))`.")
 (defun simulation-area (frame)
   "Get a scheme area with simulation model (the one which can be
 rotated and looks like a finished product) if there is such area."
-  (find-if
-   (alex:compose
-    (alex:rcurry #'typep 'rotatable-scheme-model)
-    #'scheme-area-model)
-   (frame-scheme-areas frame)))
+  (find-if (alex:rcurry #'typep 'rotatable-scheme-model)
+           (frame-scheme-areas frame)
+           :key #'scheme-area-model))
+
+;; Add a reading line menu items if one of the scheme areas support it
+(defun find-area-with-reading-line (frame)
+  (find-if (alex:rcurry #'typep 'reading-line-mixin)
+           (frame-scheme-areas frame)))
+
+(defun set-focus-on-corrected-area (parent frame)
+  (declare (ignore parent))
+  (gtk-widget-grab-focus
+   (find-area-with-reading-line frame)))
+
+(defun toggle-reading-line (parent frame active)
+  (declare (ignore parent))
+  (let ((area (find-area-with-reading-line frame)))
+    (setf (scheme-area-show-reading-line-p area) active)
+    (gtk-widget-queue-draw area)))
 
 (defmethod additional-tools append ((frame document-frame))
-  nil)
+  (alex:when-let ((reading-line-scheme (find-area-with-reading-line frame)))
+    (list
+     (menu-item "_Reading line" t #'toggle-reading-line)
+     (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area))))
+
+;; Scheme area with reading line mixin
+(defclass scheme-area-with-reading-line (scheme-area reading-line-mixin)
+  ()
+  (:metaclass gobject-class))
 
 ;; ROPE-FRAME
 (defclass rope-frame (document-frame)
@@ -80,11 +102,7 @@ rotated and looks like a finished product) if there is such area."
                                :valign        :fill
                                :vexpand       t
                                :model         (make-instance 'draft-model :document document))
-                (make-instance (closer-mop:ensure-class
-                                'scheme-area-with-reading-line
-                                :metaclass 'gobject-class
-                                :direct-superclasses (mapcar #'find-class
-                                                             '(scheme-area reading-line-mixin)))
+                (make-instance 'scheme-area-with-reading-line
                                :width-request 200
                                :valign        :fill
                                :vexpand       t
@@ -196,22 +214,9 @@ There is no undo operation yet. Do not forget to save your document before cloni
     (setf (scheme-area-show-markings-p draft-area) nil)
     (gtk-widget-queue-draw draft-area)))
 
-(defun set-focus-on-corrected-area (parent frame)
-  (declare (ignore parent))
-  (gtk-widget-grab-focus
-   (second (frame-scheme-areas frame))))
-
-(defun toggle-reading-line (parent frame active)
-  (declare (ignore parent))
-  (let ((corrected-area (second (frame-scheme-areas frame))))
-    (setf (scheme-area-show-reading-line-p corrected-area) active)
-    (gtk-widget-queue-draw corrected-area)))
-
 (defmethod additional-tools append ((frame rope-frame))
   (list
-   (menu-item "_Clone rows" nil #'clone-rows)
-   (menu-item "_Reading line" t #'toggle-reading-line)
-   (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area)))
+   (menu-item "_Clone rows" nil #'clone-rows)))
 
 ;; RING-FRAME
 (defclass ring-frame (document-frame)
@@ -223,7 +228,7 @@ There is no undo operation yet. Do not forget to save your document before cloni
   (declare (ignore initargs))
   (let ((document (frame-document frame)))
     (setf (frame-scheme-areas frame)
-          (list (make-instance 'scheme-area
+          (list (make-instance 'scheme-area-with-reading-line
                                ;; FIXME: Must not specify this by hand
                                :outline-width  1d-3
                                :height-request 400
