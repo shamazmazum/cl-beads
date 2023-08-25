@@ -230,11 +230,19 @@ There is no undo operation yet. Do not forget to save your document before cloni
                                :height-request 400
                                :halign         :fill
                                :hexpand        t
-                               :model          (make-instance 'ring-model :document document))))
+                               :model          (make-instance 'ring-model :document document))
+                (make-instance 'scheme-area
+                               :outline-width  1d-3
+                               :height-request 400
+                               :halign         :fill
+                               :hexpand        t
+                               :model          (make-instance 'ring-simulated-model :document document))))
 
     ;; Add widgets to the frame box
-    ;; The drawing area
-    (gtk-container-add frame (first (frame-scheme-areas frame)))))
+    (let ((box (make-instance 'gtk-vbox)))
+      (loop for scheme-area in (frame-scheme-areas frame) do
+            (gtk-box-pack-start box scheme-area :expand nil))
+      (gtk-container-add frame box))))
 
 (defmethod make-document-frame ((document document-ring) &key pathname)
   (make-instance 'ring-frame
@@ -243,6 +251,9 @@ There is no undo operation yet. Do not forget to save your document before cloni
 
 (defmethod preferred-orientation ((frame ring-frame))
   :horizontal)
+
+(defmethod simulation-area ((frame ring-frame))
+  (second (frame-scheme-areas frame)))
 
 (sera:-> make-preferred-box (orientation)
          (values gtk-box &optional))

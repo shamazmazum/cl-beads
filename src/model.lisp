@@ -216,3 +216,42 @@ with a crochet (I suppose. I never used that technique.) or a needle.")
           (array-row-major-index scheme i j))))
      (si:product (si:range 0 height)
                  (si:range 0 width)))))
+
+(defclass ring-simulated-model (rotatable-scheme-model standard-bead-size-mixin)
+  ()
+  (:documentation "Scheme model for the final result (ring)"))
+
+(defmethod beads-iterator ((model ring-simulated-model))
+  (let* ((document (scheme-model-document model))
+         (width  (document-width  document))
+         (height (document-height document))
+         (scheme (document-scheme document))
+         (bead-size (bead-size model))
+         (bead-size/2 (/ bead-size 2))
+         (row-length (ceiling width 2))
+         (offset (/ (- 1 (* 0.5 bead-size width)) 2)))
+    ;; TODO: make common with simulated rope model
+    (flet ((bead-rect (y x)
+             ;; Rows have a different "shift"
+             (if (oddp y)
+                 ;; Odd row
+                 (rect (+ offset (if (zerop x) 0 (* bead-size (- x 0.5))))
+                       (* y bead-size)
+                       (if (zerop x) bead-size/2 bead-size)
+                       bead-size)
+                 ;; Even row
+                 (rect (+ offset (* x bead-size))
+                       (+        (* y bead-size))
+                       (if (= (1+ x) row-length)
+                           bead-size/2 bead-size)
+                       bead-size))))
+    (si:imap
+     (lambda (coord)
+       (destructuring-bind (i . j) coord
+         (let ((%j (mod (+ j (model-rotation model)) width)))
+           (bead-spec
+            (bead-rect i j)
+            (palette-color document (aref scheme i %j))
+            (array-row-major-index scheme i %j)))))
+     (si:product (si:range 0 height)
+                 (si:range 0 row-length))))))
