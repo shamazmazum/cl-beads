@@ -1,7 +1,5 @@
 (in-package :cl-beads)
 
-(deftype orientation () '(member :horizontal :vertical))
-
 ;; FIXME: Invent a consistency mechanism for the checkbutton
 (sera:defconstructor menu-item
   (label      string)
@@ -106,6 +104,7 @@ rotated and looks like a finished product) if there is such area."
                                :width-request 200
                                :valign        :fill
                                :vexpand       t
+                               :orientation   :horizontal
                                :model         (make-instance 'corrected-model :document document))
                 (make-instance 'scheme-area
                                :width-request 200
@@ -234,6 +233,8 @@ There is no undo operation yet. Do not forget to save your document before cloni
                                :height-request 400
                                :halign         :fill
                                :hexpand        t
+                               :orientation    :vertical
+                               :step-scale     2
                                :model          (make-instance 'ring-model :document document))
                 (make-instance 'scheme-area
                                :outline-width  1d-3

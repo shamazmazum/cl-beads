@@ -250,17 +250,28 @@ CTX."
               (cairo-restore ctx)))))
   nil)
 
-;; Reader line
+;; Reading line
+(deftype orientation () '(member :horizontal :vertical))
 
 (defclass reading-line-mixin (gtk-widget)
-  ((line-position :initform 0
-                  :initarg  :line-position
-                  :type     unsigned-byte
-                  :accessor scheme-area-line-position)
-   (show-line-p   :initform nil
-                  :initarg  :show-line-p
-                  :type     boolean
-                  :accessor scheme-area-show-reading-line-p))
+  ((line-position    :initform 0
+                     :initarg  :line-position
+                     :type     unsigned-byte
+                     :accessor scheme-area-line-position)
+   (line-orientation :initform (error "Specify orientation")
+                     :initarg  :orientation
+                     :reader   scheme-area-line-orientation
+                     :type     orientation)
+   (line-step-scale  :initform 1
+                     :initarg  :step-scale
+                     :reader   scheme-area-line-step-scale
+                     :type     alex:positive-integer
+                     :documentation "Allows to move the reading line
+by fractional parts of column/row size")
+   (show-line-p      :initform nil
+                     :initarg  :show-line-p
+                     :type     boolean
+                     :accessor scheme-area-show-reading-line-p))
   (:metaclass gobject-class)
   (:documentation "A reading line for scheme-area object"))
 
@@ -272,7 +283,9 @@ CTX."
          (color (document-outline-color (scheme-model-document model)))
          (bead-size (bead-size model))
          (position (* bead-size
-                      (+ (scheme-area-line-position widget) 5d-1))))
+                      (+ (/ (scheme-area-line-position widget)
+                            (scheme-area-line-step-scale widget))
+                         5d-1))))
 
     ;; Draw focus if needed
     (when (gtk-widget-has-focus widget)
@@ -295,23 +308,52 @@ CTX."
        (color-b color)
        5d-1)
       (cairo-set-line-width ctx (* 2 (scheme-area-outline-width widget)))
-      (cairo-move-to ctx 0 position)
-      (cairo-line-to ctx 1 position)
+      (ecase (scheme-area-line-orientation widget)
+        (:vertical
+         (cairo-move-to ctx position 0)
+         (cairo-line-to ctx position (estimate-height model)))
+        (:horizontal
+         (cairo-move-to ctx 0 position)
+         (cairo-line-to ctx 1 position)))
       (cairo-stroke ctx)))
   nil)
+
+(sera:-> dec-key (orientation)
+         (values fixnum &optional))
+(defun dec-key (orientation)
+  (ecase orientation
+    (:vertical   #xff51)
+    (:horizontal #xff54)))
+
+(sera:-> inc-key (orientation)
+         (values fixnum &optional))
+(defun inc-key (orientation)
+  (ecase orientation
+    (:vertical   #xff53)
+    (:horizontal #xff52)))
+
+(sera:-> reading-line-limit (document orientation)
+         (values alex:positive-fixnum &optional))
+(defun reading-line-limit (document orientation)
+  (ecase orientation
+    (:vertical   (document-width  document))
+    (:horizontal (document-height document))))
 
 (defun key-pressed (widget event)
   (when (scheme-area-show-reading-line-p widget)
     (let ((document (scheme-model-document
-                     (scheme-area-model widget))))
+                     (scheme-area-model widget)))
+          (key (gdk-event-key-keyval event))
+          (orientation (scheme-area-line-orientation widget)))
       (with-accessors ((position scheme-area-line-position))
           widget
-        (case (gdk-event-key-keyval event)
-          (#xff52
+        (cond
+          ((= key (inc-key orientation))
            (setf position (min (1+ position)
-                               (document-height document)))
+                               (* (scheme-area-line-step-scale widget)
+                                  (reading-line-limit document orientation))))
            (gtk-widget-queue-draw widget))
-          (#xff54
+          ((= key (dec-key orientation))
            (setf position (max (1- position) 0))
            (gtk-widget-queue-draw widget)))))
     ;; Prevent focus from leaving the area if the line is currently
