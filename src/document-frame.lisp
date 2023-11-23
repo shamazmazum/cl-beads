@@ -81,7 +81,7 @@ rotated and looks like a finished product) if there is such area."
     (list
      (menu-item "_Reading line" t #'toggle-reading-line)
      (menu-item "Re_set reading line" nil #'reset-reading-line)
-     (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area))))
+     (menu-item "Set _focus on the scheme" nil #'set-focus-on-corrected-area))))
 
 ;; Scheme area with reading line mixin
 (defclass scheme-area-with-reading-line (scheme-area reading-line-mixin)
