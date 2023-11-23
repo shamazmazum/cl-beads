@@ -310,6 +310,15 @@ document's window is created or destroyed."
                       (palette-button-color current-color)
                       (current-color document)))))))))
 
+    ;; Set dirty state on the frame when the reading line's position
+    ;; was changed.
+    (alex:when-let ((area (find-area-with-reading-line document-frame)))
+      (g-signal-connect
+       area "my-reading-line-position-changed"
+       (lambda (widget)
+         (declare (ignore widget))
+         (setf (frame-dirty-state-p document-frame) t))))
+
     ;; Ask for a confirmation when closing a window in dirty state
     (g-signal-connect
      window "delete-event"

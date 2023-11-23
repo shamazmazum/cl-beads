@@ -254,11 +254,7 @@ CTX."
 (deftype orientation () '(member :horizontal :vertical))
 
 (defclass reading-line-mixin (gtk-widget)
-  ((line-position    :initform 0
-                     :initarg  :line-position
-                     :type     unsigned-byte
-                     :accessor scheme-area-line-position)
-   (line-orientation :initform (error "Specify orientation")
+  ((line-orientation :initform (error "Specify orientation")
                      :initarg  :orientation
                      :reader   scheme-area-line-orientation
                      :type     orientation)
@@ -280,10 +276,11 @@ by fractional parts of column/row size")
   (let* ((ctx (pointer ctx))
          (allocation (gtk-widget-get-allocation widget))
          (model (scheme-area-model widget))
-         (color (document-outline-color (scheme-model-document model)))
+         (document (scheme-model-document model))
+         (color (document-outline-color document))
          (bead-size (bead-size model))
          (position (* bead-size
-                      (+ (/ (scheme-area-line-position widget)
+                      (+ (/ (document-reading-line-position document)
                             (scheme-area-line-step-scale widget))
                          5d-1))))
 
@@ -345,17 +342,19 @@ by fractional parts of column/row size")
                      (scheme-area-model widget)))
           (key (gdk-event-key-keyval event))
           (orientation (scheme-area-line-orientation widget)))
-      (with-accessors ((position scheme-area-line-position))
-          widget
-        (cond
-          ((= key (inc-key orientation))
-           (setf position (min (1+ position)
-                               (* (scheme-area-line-step-scale widget)
-                                  (reading-line-limit document orientation))))
-           (gtk-widget-queue-draw widget))
-          ((= key (dec-key orientation))
-           (setf position (max (1- position) 0))
-           (gtk-widget-queue-draw widget)))))
+      (with-accessors ((position document-reading-line-position))
+          document
+        (let ((position-changed-p
+               (cond
+                 ((= key (inc-key orientation))
+                  (setf position (min (1+ position)
+                                      (* (scheme-area-line-step-scale widget)
+                                         (reading-line-limit document orientation)))))
+                 ((= key (dec-key orientation))
+                  (setf position (max (1- position) 0))))))
+          (when position-changed-p
+            (gtk-widget-queue-draw widget)
+            (g-signal-emit widget "my-reading-line-position-changed")))))
     ;; Prevent focus from leaving the area if the line is currently
     ;; shown
     t))

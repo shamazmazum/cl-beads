@@ -63,6 +63,13 @@ rotated and looks like a finished product) if there is such area."
   (gtk-widget-grab-focus
    (find-area-with-reading-line frame)))
 
+(defun reset-reading-line (parent frame)
+  (declare (ignore parent))
+  (setf (document-reading-line-position (frame-document frame)) 0
+        (frame-dirty-state-p frame) t)
+  (gtk-widget-queue-draw
+   (find-area-with-reading-line frame)))
+
 (defun toggle-reading-line (parent frame active)
   (declare (ignore parent))
   (let ((area (find-area-with-reading-line frame)))
@@ -73,6 +80,7 @@ rotated and looks like a finished product) if there is such area."
   (alex:when-let ((reading-line-scheme (find-area-with-reading-line frame)))
     (list
      (menu-item "_Reading line" t #'toggle-reading-line)
+     (menu-item "Re_set reading line" nil #'reset-reading-line)
      (menu-item"Set _focus on the scheme" nil #'set-focus-on-corrected-area))))
 
 ;; Scheme area with reading line mixin

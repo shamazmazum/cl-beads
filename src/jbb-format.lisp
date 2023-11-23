@@ -37,6 +37,10 @@
                      (let* ((view  (alex:assoc-value content 'clb-sym::view))
                             (color (alex:assoc-value view    'clb-sym::outline-color)))
                        (if color (parse-color (car color)) *default-outline-color*))
+                     :reading-line-position
+                     (let* ((view     (alex:assoc-value content 'clb-sym::view))
+                            (position (alex:assoc-value view    'clb-sym::reading-line-position)))
+                       (or (car position) 0))
                      :scheme
                      (let ((model (mapcar #'cdr (alex:assoc-value content 'clb-sym::model))))
                        (make-array (list (length model)
@@ -80,7 +84,9 @@
                        ,(floor (* 255 (color-r color)))
                        ,(floor (* 255 (color-g color)))
                        ,(floor (* 255 (color-b color)))
-                       255))))
+                       255)))
+                 (clb-sym::reading-line-position
+                  ,(document-reading-line-position document)))
                 (clb-sym::model
                  ,@(loop for i below (document-height document) collect
                          (cons 'clb-sym::row

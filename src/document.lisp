@@ -84,6 +84,11 @@
                   :initarg  :outline-color
                   :type     color
                   :accessor document-outline-color)
+   (reding-line-position
+                  :initform 0
+                  :initarg  :reading-line-position
+                  :type     unsigned-byte
+                  :accessor document-reading-line-position)
    (author        :initform ""
                   :initarg  :author
                   :type     string

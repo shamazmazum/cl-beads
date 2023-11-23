@@ -38,6 +38,9 @@
        :outline-color
        (let ((view (alex:assoc-value content 'clb-sym::view)))
          (parse-clb-color (car (alex:assoc-value view 'clb-sym::outline-color))))
+       :reading-line-position
+       (let ((view (alex:assoc-value content 'clb-sym::view)))
+         (or (alex:assoc-value view 'clb-sym::reading-line-position) 0))
        :scheme
        (let ((model (mapcar #'cdr (alex:assoc-value content 'clb-sym::model))))
          (make-array (list (length model)
@@ -67,7 +70,9 @@
                       (clb-sym::rgb
                        ,(color-r color)
                        ,(color-g color)
-                       ,(color-b color)))))
+                       ,(color-b color))))
+                 (clb-sym::reading-line-position . ,(document-reading-line-position
+                                                     document)))
                 (clb-sym::model
                  ,@(loop for i below (document-height document) collect
                          (cons 'clb-sym::row

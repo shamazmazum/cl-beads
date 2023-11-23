@@ -27,6 +27,8 @@
             +g-type-none+ 0
             (cffi:null-pointer))))
     (mapc #'trivial-new-signal
-          '("my-color-set" "my-background-change-request"))))
+          '("my-color-set"
+            "my-background-change-request"
+            "my-reading-line-position-changed"))))
 
 (sera:defalias add-new-signals-once (sera:once #'add-new-signals))
